@@ -4,7 +4,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const cron = require('node-cron');
 const axios = require('axios');
-
+const adminRoutes = require('./routes/admin');
 const app = express();
 
 // Middleware
@@ -18,6 +18,7 @@ const miningRoutes = require('./routes/mining');
 app.use('/api/mining', miningRoutes);
 const withdrawalRoutes = require('./routes/withdrawal');
 app.use('/api/withdrawal', withdrawalRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Simple test route
 app.get('/', (req, res) => {
