@@ -218,4 +218,17 @@ router.get('/users', verifyAdminToken, async (req, res) => {
 
   res.json({ total, users });
 });
+
+router.post('/users/:id/freeze', verifyAdminToken, async (req, res) => {
+  const { id } = req.params;
+  const { freeze } = req.body;
+
+  try {
+    const user = await User.findByIdAndUpdate(id, { isFrozen: freeze }, { new: true });
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    res.json({ message: freeze ? 'User frozen' : 'User unfrozen', user });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
 module.exports = router;
