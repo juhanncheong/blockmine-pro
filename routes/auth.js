@@ -54,9 +54,9 @@ res.status(201).json({
 });
 
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Server error' });
-  }
+  console.error("Signup error:", err);
+  res.status(500).json({ message: 'Server error' });
+}
 });
 
 // Login Route
