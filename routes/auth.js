@@ -3,6 +3,7 @@ const bcrypt = require('bcryptjs');
 const User = require('../models/User');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
+const MiningPurchase = require('../models/MiningPurchase');
 
 // Generate random referral code
 function generateReferralCode(length = 6) {
@@ -70,6 +71,10 @@ router.post('/login', async (req, res) => {
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) return res.status(400).json({ message: 'Invalid credentials' });
 
+    // ✅ Calculate miningPower dynamically:
+    const purchases = await MiningPurchase.find({ userId: user._id, isActive: true }).populate('packageId');
+    const totalMiningPower = purchases.reduce((sum, purchase) => sum + (purchase.packageId?.miningPower || 0), 0);
+
     const token = jwt.sign(
       { userId: user._id },
       process.env.JWT_SECRET,
@@ -84,12 +89,12 @@ router.post('/login', async (req, res) => {
         email: user.email,
         balance: user.balance,
         earnings: user.earnings,
-        miningPower: user.miningPower,
+        miningPower: totalMiningPower, 
         referralCode: user.referralCode,
         ownReferralCode: user.ownReferralCode
       }
     });
-    
+
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });

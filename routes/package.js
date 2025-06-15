@@ -85,9 +85,6 @@ router.post('/purchase', async (req, res) => {
     }
 
     user.balance = parseFloat((user.balance - requiredBTC).toFixed(8));
-    user.miningPower += packageData.miningPower;
-
-    await user.save();
 
     await Transaction.create({
       userId: user._id,
@@ -101,11 +98,15 @@ router.post('/purchase', async (req, res) => {
      earnings: 0,
      isActive: true
     }); 
-    res.json({
-      message: 'Package purchased successfully',
-      miningPower: user.miningPower,
-      balance: user.balance
-    });
+    // ✅ Dynamically calculate miningPower after purchase
+const purchases = await MiningPurchase.find({ userId: user._id, isActive: true }).populate('packageId');
+const totalMiningPower = purchases.reduce((sum, purchase) => sum + (purchase.packageId?.miningPower || 0), 0);
+
+res.json({
+  message: 'Package purchased successfully',
+  miningPower: totalMiningPower,
+  balance: user.balance
+});
 
   } catch (err) {
     console.error("🔥 Purchase error:", err);

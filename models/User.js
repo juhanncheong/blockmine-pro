@@ -7,7 +7,6 @@ const userSchema = new mongoose.Schema({
   referralCode: { type: String, required: true },   // Code they used to register
   ownReferralCode: { type: String, required: true }, // Code we generate for them
 
-  miningPower: { type: Number, default: 0 }, // TH/s
   earnings: { type: Number, default: 0 }, // Total mined
   balance: { type: Number, default: 0 },  // Available wallet balance
   totalWithdrawn: { type: Number, default: 0 },
