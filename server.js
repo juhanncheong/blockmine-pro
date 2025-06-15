@@ -7,6 +7,7 @@ const axios = require('axios');
 const adminRoutes = require('./routes/admin');
 const app = express();
 const walletRoutes = require("./routes/wallet");
+const depositRoutes = require("./routes/deposit");
 
 // Middleware
 app.use(express.json());
@@ -21,6 +22,7 @@ const withdrawalRoutes = require('./routes/withdrawal');
 app.use('/api/withdrawal', withdrawalRoutes);
 app.use('/api/admin', adminRoutes);
 app.use("/api/wallet", walletRoutes);
+app.use("/api/deposit", depositRoutes);
 
 // Simple test route
 app.get('/', (req, res) => {
