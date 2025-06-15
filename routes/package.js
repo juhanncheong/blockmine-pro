@@ -97,4 +97,18 @@ router.post('/purchase', async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 });
+router.delete('/delete/:id', async (req, res) => {
+  try {
+    const deletedPackage = await Package.findByIdAndDelete(req.params.id);
+
+    if (!deletedPackage) {
+      return res.status(404).json({ message: 'Package not found' });
+    }
+
+    res.json({ message: 'Package deleted successfully' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
 module.exports = router;
