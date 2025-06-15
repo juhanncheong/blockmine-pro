@@ -11,7 +11,10 @@ router.get("/balance/:userId", async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    res.json({ btcBalance: user.balance || 0 });
+    res.json({ 
+  btcBalance: user.balance || 0,
+  miningPower: user.miningPower || 0
+});
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server error" });
