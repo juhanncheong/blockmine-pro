@@ -3,8 +3,9 @@ const mongoose = require('mongoose');
 const axios = require('axios');
 const User = require('../models/User');
 require('dotenv').config();
-
+const MiningPurchase = require('../models/MiningPurchase');
 const router = express.Router();
+const Package = require('../models/Package');
 
 router.post('/run-daily-earnings', async (req, res) => {
   try {
@@ -42,4 +43,29 @@ router.post('/run-daily-earnings', async (req, res) => {
   }
 });
 
+// Auto-expire packages
+router.post('/cleanup-expired', async (req, res) => {
+  try {
+    const purchases = await MiningPurchase.find({ isActive: true }).populate('packageId');
+
+    for (let purchase of purchases) {
+      const purchaseDate = new Date(purchase.purchaseDate);
+      const today = new Date();
+      const daysPassed = Math.floor((today - purchaseDate) / (1000 * 60 * 60 * 24));
+      const duration = purchase.packageId.duration;
+
+      if (daysPassed >= duration) {
+        purchase.isActive = false;
+        await purchase.save();
+        console.log(`Marked purchase ${purchase._id} as expired`);
+      }
+    }
+
+    res.json({ message: 'Expiration check completed successfully.' });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error while cleaning expired purchases' });
+  }
+});
 module.exports = router;
