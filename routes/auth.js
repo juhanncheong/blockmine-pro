@@ -40,7 +40,18 @@ router.post('/register', async (req, res) => {
     });
 
     await newUser.save();
-    res.status(201).json({ message: 'User registered successfully' });
+
+// Generate JWT after registration
+const token = jwt.sign(
+  { userId: newUser._id },
+  process.env.JWT_SECRET,
+  { expiresIn: '30d' }
+);
+
+res.status(201).json({
+  token,
+  userId: newUser._id
+});
 
   } catch (err) {
     console.error(err);
@@ -69,16 +80,9 @@ router.post('/login', async (req, res) => {
     );
 
     res.json({
-      token,
-      user: {
-        id: user._id,
-        username: user.username,
-        email: user.email,
-        balance: user.balance,
-        earnings: user.earnings,
-        miningPower: user.miningPower
-      }
-    });
+  token,
+  userId: user._id
+});
 
   } catch (err) {
     console.error(err);
