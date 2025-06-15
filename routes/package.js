@@ -4,6 +4,7 @@ const router = express.Router();
 const axios = require('axios');
 const User = require('../models/User');
 const Transaction = require('../models/Transaction');
+const MiningPurchase = require('../models/MiningPurchase');
 
 // Create new package (Admin Only)
 router.post('/create', async (req, res) => {
@@ -93,7 +94,13 @@ router.post('/purchase', async (req, res) => {
       type: 'purchase',
       amount: requiredBTC
     });
-
+    await MiningPurchase.create({
+     userId: user._id,
+     packageId: packageData._id,
+     purchaseDate: new Date(), // default
+     earnings: 0,
+     isActive: true
+    }); 
     res.json({
       message: 'Package purchased successfully',
       miningPower: user.miningPower,
@@ -116,6 +123,19 @@ router.delete('/delete/:id', async (req, res) => {
     }
 
     res.json({ message: 'Package deleted successfully' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// ✅ Get all purchases for a user
+router.get('/my-purchases/:userId', async (req, res) => {
+  try {
+    const purchases = await MiningPurchase.find({ userId: req.params.userId })
+      .populate('packageId');
+
+    res.json(purchases);
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });
