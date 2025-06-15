@@ -74,10 +74,11 @@ router.get('/users', verifyAdminToken, async (req, res) => {
     }
     const total = await User.countDocuments(query);
     const users = await User.find(query)
-      .skip(skip)
-      .limit(limit)
-      .select('username email referralCode balance')
-      .lean();
+    .sort({ createdAt: -1 }) // newest first
+    .skip(skip)
+    .limit(limit)
+    .select('username email referralCode balance')
+    .lean();
 
     res.json({
       total,
@@ -199,4 +200,18 @@ router.delete('/packages/:id', verifyAdminToken, async (req, res) => {
   }
 });
 
+
+router.get('/users', verifyAdminToken, async (req, res) => {
+  const { email, page = 1 } = req.query;
+  const limit = 10;
+  const skip = (page - 1) * limit;
+
+  let query = {};
+  if (email) query.email = { $regex: email, $options: 'i' };
+
+  const total = await User.countDocuments(query);
+  const users = await User.find(query).skip(skip).limit(limit).lean();
+
+  res.json({ total, users });
+});
 module.exports = router;
