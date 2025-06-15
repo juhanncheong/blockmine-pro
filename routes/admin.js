@@ -61,9 +61,9 @@ router.get('/stats', verifyAdminToken, async (req, res) => {
   }
 });
 
-// User Management (search + paginate)
+// User Management (search + paginate + sort)
 router.get('/users', verifyAdminToken, async (req, res) => {
-  const { email, page = 1 } = req.query;
+  const { email, page = 1, sort = 'desc' } = req.query;
   const limit = 10;
   const skip = (page - 1) * limit;
 
@@ -72,13 +72,16 @@ router.get('/users', verifyAdminToken, async (req, res) => {
     if (email) {
       query.email = { $regex: email, $options: 'i' };
     }
+
     const total = await User.countDocuments(query);
+
+    // Apply sorting to show latest users first (by _id)
     const users = await User.find(query)
-    .sort({ createdAt: -1 }) // newest first
-    .skip(skip)
-    .limit(limit)
-    .select('username email referralCode balance')
-    .lean();
+      .sort({ _id: sort === 'desc' ? -1 : 1 })
+      .skip(skip)
+      .limit(limit)
+      .select('username email ownReferralCode balance isFrozen')
+      .lean();
 
     res.json({
       total,
@@ -87,6 +90,7 @@ router.get('/users', verifyAdminToken, async (req, res) => {
       users,
     });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ message: 'Server error' });
   }
 });
