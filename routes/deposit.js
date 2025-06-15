@@ -2,8 +2,9 @@ const express = require("express");
 const router = express.Router();
 const Deposit = require("../models/Deposit");
 const User = require("../models/User");
+const Transaction = require("../models/Transaction");
 
-// Get all deposits (with optional email search)
+// Existing GET route stays the same
 router.get("/admin/list", async (req, res) => {
   const { email } = req.query;
 
@@ -25,7 +26,7 @@ router.get("/admin/list", async (req, res) => {
   }
 });
 
-
+// Modified POST route
 router.post("/admin/deposit", async (req, res) => {
   try {
     const { userId, amount } = req.body;
@@ -41,6 +42,14 @@ router.post("/admin/deposit", async (req, res) => {
 
     user.balance += parseFloat(amount);
     await user.save();
+
+    // ✅ Create Transaction record
+    const newTransaction = new Transaction({
+      userId: user._id,
+      type: "deposit",
+      amount: parseFloat(amount)
+    });
+    await newTransaction.save();
 
     res.json({ message: "Deposit added successfully" });
   } catch (err) {
