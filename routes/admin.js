@@ -231,4 +231,32 @@ router.post('/users/:id/freeze', verifyAdminToken, async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 });
+
+const Deposit = require("../models/Deposit"); // Import your Deposit model
+
+router.post("/admin/deposit", async (req, res) => {
+  try {
+    const { userId, amount } = req.body;
+
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    // Create deposit record
+    const newDeposit = new Deposit({
+      userId: user._id,
+      amount: parseFloat(amount),
+    });
+    await newDeposit.save();
+
+    // Update user balance
+    user.balance += parseFloat(amount);
+    await user.save();
+
+    res.json({ message: "Deposit added successfully" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
 module.exports = router;
