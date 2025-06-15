@@ -19,23 +19,34 @@ router.post('/run-daily-earnings', async (req, res) => {
     const users = await User.find();
 
     for (let user of users) {
-      if (user.miningPower > 0) {
-        // Calculate USD earnings
-        const earningsUSD = user.miningPower * earningRate;
+      // Find active packages only
+      const activePurchases = await MiningPurchase.find({ userId: user._id, isActive: true }).populate('packageId');
 
-        // Convert to BTC
+      let totalPower = 0;
+      let totalEarningsBTC = 0;
+
+      for (let purchase of activePurchases) {
+        const packagePower = purchase.packageId.miningPower;
+        totalPower += packagePower;
+
+        const earningsUSD = packagePower * earningRate;
         const earningsBTC = earningsUSD / btcPriceUSD;
 
-        // Credit earnings into user's wallet balance
-        user.balance += earningsBTC;
+        // Add earnings to this purchase
+        purchase.earnings += earningsBTC;
+        await purchase.save();
 
-        await user.save();
-
-        console.log(`User ${user.username} earned ${earningsBTC.toFixed(8)} BTC today.`);
+        totalEarningsBTC += earningsBTC;
       }
+
+      // Add total earnings to user's wallet
+      user.balance += totalEarningsBTC;
+      await user.save();
+
+      console.log(`User ${user.username} earned ${totalEarningsBTC.toFixed(8)} BTC today.`)
     }
 
-    res.json({ message: 'Daily mining earnings completed successfully' });
+    res.json({ message: 'Daily mining earnings based on active packages completed.' });
 
   } catch (err) {
     console.error(err);
