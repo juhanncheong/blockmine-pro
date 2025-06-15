@@ -77,11 +77,11 @@ router.get('/users', verifyAdminToken, async (req, res) => {
 
     // Apply sorting to show latest users first (by _id)
     const users = await User.find(query)
-      .sort({ _id: sort === 'desc' ? -1 : 1 })
-      .skip(skip)
-      .limit(limit)
-      .select('username email ownReferralCode balance isFrozen')
-      .lean();
+  .skip(skip)
+  .limit(limit)
+  .select('username email ownReferralCode balance isFrozen miningPower') // add miningPower here
+  .lean();
+
 
     res.json({
       total,
