@@ -57,7 +57,6 @@ router.put('/edit/:id', async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 });
-// Purchase Package Route
 router.post('/purchase', async (req, res) => {
   const { userId, packageId } = req.body;
 
@@ -68,35 +67,46 @@ router.post('/purchase', async (req, res) => {
     const packageData = await Package.findById(packageId);
     if (!packageData) return res.status(404).json({ message: 'Package not found' });
 
-    // Get live BTC price (from CoinGecko)
-    const priceRes = await axios.get('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd');
-    const btcPriceUSD = priceRes.data.bitcoin.usd;
+    // ✅ Use AllOrigins proxy to fetch CoinGecko price safely
+    const priceRes = await axios.get(
+      'https://api.allorigins.win/get?url=' + 
+      encodeURIComponent('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd')
+    );
+    const parsed = JSON.parse(priceRes.data.contents);
+    const btcPriceUSD = parsed.bitcoin.usd;
 
-    // Calculate BTC amount required
-    const requiredBTC = packageData.priceUSD / btcPriceUSD;
+    const requiredBTC = parseFloat((packageData.priceUSD / btcPriceUSD).toFixed(8));
 
-    // Check user's BTC balance
     if (user.balance < requiredBTC) {
       return res.status(400).json({ message: 'Insufficient BTC balance' });
     }
 
-    // Deduct BTC balance & add mining power
-    user.balance -= requiredBTC;
+    user.balance = parseFloat((user.balance - requiredBTC).toFixed(8));
     user.miningPower += packageData.miningPower;
 
     await user.save();
 
-    res.json({ 
+    const transaction = new Transaction({
+      userId: user._id,
+      type: 'purchase',
+      amount: requiredBTC
+    });
+
+    await transaction.save();
+
+    res.json({
       message: 'Package purchased successfully',
       miningPower: user.miningPower,
       balance: user.balance
     });
 
   } catch (err) {
-    console.error(err);
+    console.error("🔥 Purchase error:", err.message);
     res.status(500).json({ message: 'Server error' });
   }
 });
+
+
 router.delete('/delete/:id', async (req, res) => {
   try {
     const deletedPackage = await Package.findByIdAndDelete(req.params.id);
