@@ -4,8 +4,10 @@ const jwt = require('jsonwebtoken');
 const Admin = require('../models/Admin');
 const User = require('../models/User');
 const Withdrawal = require('../models/Withdrawal');
-const Package = require('../models/Package');
 const router = express.Router();
+const MiningPurchase = require('../models/MiningPurchase');
+const Package = require('../models/Package');
+const Deposit = require("../models/Deposit"); 
 
 // Admin login route
 router.post('/login', async (req, res) => {
@@ -63,32 +65,29 @@ router.get('/stats', verifyAdminToken, async (req, res) => {
 
 // User Management (search + paginate + sort)
 router.get('/users', verifyAdminToken, async (req, res) => {
-  const { email, page = 1, sort = 'desc' } = req.query;
+  const { email, page = 1 } = req.query;
   const limit = 10;
   const skip = (page - 1) * limit;
 
   try {
     let query = {};
-    if (email) {
-      query.email = { $regex: email, $options: 'i' };
-    }
+    if (email) query.email = { $regex: email, $options: 'i' };
 
     const total = await User.countDocuments(query);
+    const users = await User.find(query).skip(skip).limit(limit).lean();
 
-    // Apply sorting to show latest users first (by _id)
-    const users = await User.find(query)
-  .skip(skip)
-  .limit(limit)
-  .select('username email ownReferralCode balance isFrozen miningPower') // add miningPower here
-  .lean();
+    // Now calculate miningPower for each user dynamically:
+    const usersWithMiningPower = await Promise.all(users.map(async (user) => {
+      const purchases = await MiningPurchase.find({ userId: user._id, isActive: true }).populate('packageId');
+      const totalMiningPower = purchases.reduce((sum, purchase) => sum + (purchase.packageId?.miningPower || 0), 0);
 
+      return {
+        ...user,
+        miningPower: totalMiningPower
+      };
+    }));
 
-    res.json({
-      total,
-      page: Number(page),
-      pages: Math.ceil(total / limit),
-      users,
-    });
+    res.json({ total, users: usersWithMiningPower });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });
@@ -205,34 +204,6 @@ router.delete('/packages/:id', verifyAdminToken, async (req, res) => {
 });
 
 
-router.get('/users', verifyAdminToken, async (req, res) => {
-  const { email, page = 1 } = req.query;
-  const limit = 10;
-  const skip = (page - 1) * limit;
-
-  let query = {};
-  if (email) query.email = { $regex: email, $options: 'i' };
-
-  const total = await User.countDocuments(query);
-  const users = await User.find(query).skip(skip).limit(limit).lean();
-
-  res.json({ total, users });
-});
-
-router.post('/users/:id/freeze', verifyAdminToken, async (req, res) => {
-  const { id } = req.params;
-  const { freeze } = req.body;
-
-  try {
-    const user = await User.findByIdAndUpdate(id, { isFrozen: freeze }, { new: true });
-    if (!user) return res.status(404).json({ message: 'User not found' });
-    res.json({ message: freeze ? 'User frozen' : 'User unfrozen', user });
-  } catch (err) {
-    res.status(500).json({ message: 'Server error' });
-  }
-});
-
-const Deposit = require("../models/Deposit"); // Import your Deposit model
 
 router.post("/admin/deposit", async (req, res) => {
   try {
