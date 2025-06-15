@@ -57,6 +57,7 @@ router.put('/edit/:id', async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 });
+// ✅ PURCHASE Package (Clean Logic)
 router.post('/purchase', async (req, res) => {
   const { userId, packageId } = req.body;
 
@@ -67,9 +68,9 @@ router.post('/purchase', async (req, res) => {
     const packageData = await Package.findById(packageId);
     if (!packageData) return res.status(404).json({ message: 'Package not found' });
 
-    // ✅ Use AllOrigins proxy to fetch CoinGecko price safely
+    // ✅ Fetch live BTC price via AllOrigins proxy
     const priceRes = await axios.get(
-      'https://api.allorigins.win/get?url=' + 
+      'https://api.allorigins.win/get?url=' +
       encodeURIComponent('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd')
     );
     const parsed = JSON.parse(priceRes.data.contents);
@@ -86,13 +87,11 @@ router.post('/purchase', async (req, res) => {
 
     await user.save();
 
-    const transaction = new Transaction({
+    await Transaction.create({
       userId: user._id,
       type: 'purchase',
       amount: requiredBTC
     });
-
-    await transaction.save();
 
     res.json({
       message: 'Package purchased successfully',
@@ -101,8 +100,8 @@ router.post('/purchase', async (req, res) => {
     });
 
   } catch (err) {
-    console.error("🔥 Purchase error:", err.message);
-    res.status(500).json({ message: 'Server error' });
+    console.error("🔥 Purchase error:", err);
+    res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
 
