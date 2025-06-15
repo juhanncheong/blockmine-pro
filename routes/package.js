@@ -6,14 +6,15 @@ const User = require('../models/User');
 
 // Create new package (Admin Only)
 router.post('/create', async (req, res) => {
-  const { name, priceUSD, miningPower, duration } = req.body;
+  const { name, priceUSD, miningPower, duration, description } = req.body;
 
   try {
     const newPackage = new Package({
       name,
       priceUSD,
       miningPower,
-      duration
+      duration,
+      description  // ✅ Add description here
     });
 
     await newPackage.save();
