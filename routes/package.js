@@ -38,12 +38,12 @@ router.get('/all', async (req, res) => {
 
 // Edit package (Admin Only)
 router.put('/edit/:id', async (req, res) => {
-  const { name, priceUSD, miningPower, duration } = req.body;
+  const { name, priceUSD, miningPower, duration, description } = req.body;
 
   try {
     const updatedPackage = await Package.findByIdAndUpdate(
       req.params.id,
-      { name, priceUSD, miningPower, duration },
+      { name, priceUSD, miningPower, duration, description },
       { new: true }
     );
 
