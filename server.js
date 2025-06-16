@@ -8,6 +8,7 @@ const adminRoutes = require('./routes/admin');
 const app = express();
 const walletRoutes = require("./routes/wallet");
 const depositRoutes = require("./routes/deposit");
+const pendingDepositRoutes = require("./routes/pendingDeposit");
 const transactionRoutes = require("./routes/transaction");
 const referralRoutes = require('./routes/referral');
 const adminReferralRoutes = require('./routes/adminReferral');
@@ -29,6 +30,7 @@ app.use("/api/deposit", depositRoutes);
 app.use("/api/transactions", transactionRoutes);
 app.use('/api/referral', referralRoutes);
 app.use('/api/admin/referral', adminReferralRoutes);
+app.use("/api/pending-deposit", pendingDepositRoutes);
 
 // Simple test route
 app.get('/', (req, res) => {
