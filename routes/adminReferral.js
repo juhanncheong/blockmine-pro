@@ -17,6 +17,12 @@ router.get("/by-email", async (req, res) => {
 
     const invitedUsers = await User.find({ referralCode: user.ownReferralCode }).select("email createdAt");
     const referralCount = invitedUsers.length;
+    
+    // ✅ Fetch commission transactions history
+const transactions = await Transaction.find({
+  userId: user._id,
+  type: "referral-commission"
+}).sort({ createdAt: -1 }).select("amount createdAt");
 
     // ✅ Calculate commissions
     let totalReferralCommission = 0;
@@ -28,12 +34,14 @@ router.get("/by-email", async (req, res) => {
     }
 
     res.json({
-      email: user.email,
-      ownReferralCode: user.ownReferralCode,
-      referralCount,
-      invitedUsers,
-      totalReferralCommission: totalReferralCommission.toFixed(8)
-    });
+  email: user.email,
+  ownReferralCode: user.ownReferralCode,
+  referralCount,
+  invitedUsers,
+  totalReferralCommission: totalReferralCommission.toFixed(8),
+  transactions  // ✅ full transactions list
+});
+
 
   } catch (err) {
     console.error(err);
