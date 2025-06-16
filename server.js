@@ -9,6 +9,7 @@ const app = express();
 const walletRoutes = require("./routes/wallet");
 const depositRoutes = require("./routes/deposit");
 const transactionRoutes = require("./routes/transaction");
+const referralRoutes = require('./routes/referral');
 
 // Middleware
 app.use(express.json());
@@ -25,6 +26,7 @@ app.use('/api/admin', adminRoutes);
 app.use("/api/wallet", walletRoutes);
 app.use("/api/deposit", depositRoutes);
 app.use("/api/transactions", transactionRoutes);
+app.use('/api/referral', referralRoutes);
 
 // Simple test route
 app.get('/', (req, res) => {
