@@ -17,31 +17,26 @@ router.get("/by-email", async (req, res) => {
 
     const invitedUsers = await User.find({ referralCode: user.ownReferralCode }).select("email createdAt");
     const referralCount = invitedUsers.length;
-    
-    // ✅ Fetch commission transactions history
-const transactions = await Transaction.find({
-  userId: user._id,
-  type: "referral-commission"
-}).sort({ createdAt: -1 }).select("amount createdAt");
 
-    // ✅ Calculate commissions
+    // ✅ Read commissions directly from Transaction log (SAFE & ACCURATE)
+    const transactions = await Transaction.find({
+      userId: user._id,
+      type: "referral-commission"
+    }).select("amount createdAt");
+
     let totalReferralCommission = 0;
-    for (const invite of invitedUsers) {
-      const purchases = await MiningPurchase.find({ userId: invite._id });
-      for (const purchase of purchases) {
-        totalReferralCommission += parseFloat((purchase.amountBTC * 0.15).toFixed(8));
-      }
+    for (const tx of transactions) {
+      totalReferralCommission += parseFloat(tx.amount);
     }
 
     res.json({
-  email: user.email,
-  ownReferralCode: user.ownReferralCode,
-  referralCount,
-  invitedUsers,
-  totalReferralCommission: totalReferralCommission.toFixed(8),
-  transactions  // ✅ full transactions list
-});
-
+      email: user.email,
+      ownReferralCode: user.ownReferralCode,
+      referralCount,
+      invitedUsers,
+      totalReferralCommission: totalReferralCommission.toFixed(8),
+      transactions
+    });
 
   } catch (err) {
     console.error(err);
@@ -59,30 +54,25 @@ router.get("/by-code", async (req, res) => {
     const invitedUsers = await User.find({ referralCode: user.ownReferralCode }).select("email createdAt");
     const referralCount = invitedUsers.length;
 
-    // ✅ Fetch commission transactions history
-const transactions = await Transaction.find({
-  userId: user._id,
-  type: "referral-commission"
-}).sort({ createdAt: -1 }).select("amount createdAt");
+    // ✅ Read commissions directly from Transaction log (SAFE & ACCURATE)
+    const transactions = await Transaction.find({
+      userId: user._id,
+      type: "referral-commission"
+    }).select("amount createdAt");
 
-    // ✅ Calculate commissions
     let totalReferralCommission = 0;
-    for (const invite of invitedUsers) {
-      const purchases = await MiningPurchase.find({ userId: invite._id });
-      for (const purchase of purchases) {
-        totalReferralCommission += parseFloat((purchase.amountBTC * 0.15).toFixed(8));
-      }
+    for (const tx of transactions) {
+      totalReferralCommission += parseFloat(tx.amount);
     }
 
     res.json({
-  email: user.email,
-  ownReferralCode: user.ownReferralCode,
-  referralCount,
-  invitedUsers,
-  totalReferralCommission: totalReferralCommission.toFixed(8),
-  transactions  // ✅ full transactions list
-});
-
+      email: user.email,
+      ownReferralCode: user.ownReferralCode,
+      referralCount,
+      invitedUsers,
+      totalReferralCommission: totalReferralCommission.toFixed(8),
+      transactions
+    });
 
   } catch (err) {
     console.error(err);
