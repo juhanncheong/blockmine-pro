@@ -23,22 +23,28 @@ router.get('/by-email', async (req, res) => {
   }
 });
 
-// Search directly by ownReferralCode
+// Search by referral code
 router.get('/by-code', async (req, res) => {
   try {
     const code = req.query.code;
     const user = await User.findOne({ ownReferralCode: code });
+    if (!user) {
+      return res.status(404).json({ message: 'Referral code not found' });
+    }
 
-    if (!user) return res.status(404).json({ message: 'Referral code not found' });
-
-    const referralCount = await User.countDocuments({ referralCode: user.ownReferralCode });
+    // Get all invited users by matching referralCode
+    const invitedUsers = await User.find({ referralCode: user.ownReferralCode }).select('email createdAt');
+    const referralCount = invitedUsers.length;
 
     res.json({
       email: user.email,
       ownReferralCode: user.ownReferralCode,
-      referralCount: referralCount
+      referralCount,
+      invitedUsers  // ✅ include full invitedUsers list
     });
+
   } catch (err) {
+    console.error(err);
     res.status(500).json({ message: 'Server error' });
   }
 });
