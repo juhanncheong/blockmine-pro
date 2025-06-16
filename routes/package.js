@@ -85,6 +85,25 @@ router.post('/purchase', async (req, res) => {
     }
 
     user.balance = parseFloat((user.balance - requiredBTC).toFixed(8));
+    
+    // ✅ Handle referral commissions
+if (user.referralCode) {
+  const inviter = await User.findOne({ ownReferralCode: user.referralCode });
+  if (inviter) {
+    const commissionUSD = packageData.priceUSD * 0.15;
+    const commissionBTC = parseFloat((commissionUSD / btcPriceUSD).toFixed(8));
+
+    inviter.balance = parseFloat((inviter.balance + commissionBTC).toFixed(8));
+    await inviter.save();
+
+    // (Optional: log transaction if you want for admin reports)
+    await Transaction.create({
+      userId: inviter._id,
+      type: 'referral-commission',
+      amount: commissionBTC
+    });
+  }
+}
 
     await Transaction.create({
       userId: user._id,
