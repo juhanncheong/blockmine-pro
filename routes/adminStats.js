@@ -9,7 +9,7 @@ router.get("/", async (req, res) => {
     const totalUsers = await User.countDocuments();
 
     const deposits = await Deposit.aggregate([
-      { $group: { _id: null, total: { $sum: "$creditBTC" } } }
+      { $group: { _id: null, total: { $sum: "$amount" } } }
     ]);
     const totalDeposits = deposits[0]?.total || 0;
 
@@ -18,7 +18,7 @@ router.get("/", async (req, res) => {
     ]);
     const totalWithdrawals = withdrawals[0]?.total || 0;
 
-    const totalEarnings = 0; // you can replace later
+    const totalEarnings = 0; // you can calculate later if needed
 
     res.json({
       totalUsers,
