@@ -3,39 +3,24 @@ const router = express.Router();
 const User = require('../models/User');
 
 // GET referral stats
-router.get('/by-email', async (req, res) => {
+router.get('/:userId', async (req, res) => {
   try {
-    const rawEmail = req.query.email;
-
-    if (!rawEmail) return res.status(400).json({ message: 'Email required' });
-
-    const email = rawEmail.trim().toLowerCase();
-
-    const user = await User.findOne({ email });
-
+    const user = await User.findById(req.params.userId);
     if (!user) return res.status(404).json({ message: 'User not found' });
 
-    const invitedUsers = await User.find({ referralCode: user.ownReferralCode }).select('email createdAt');
+    // Count how many users were referred by this user's code
+    const referralCount = await User.countDocuments({ referralCode: user.ownReferralCode });
 
-    const totalCommissionResult = await Transaction.aggregate([
-      { $match: { userId: user._id, type: 'referral-commission' } },
-      { $group: { _id: null, total: { $sum: "$amount" } } }
-    ]);
-
-    const totalReferralCommission = (totalCommissionResult[0]?.total || 0).toFixed(8);
+    // (Optional) In future you can also sum commissions here if you store commissions in User model
 
     res.json({
-      email: user.email,
-      ownReferralCode: user.ownReferralCode,
-      referralCount: invitedUsers.length,
-      invitedUsers: invitedUsers,
-      totalReferralCommission: parseFloat(totalReferralCommission)
+      referralCount: referralCount,
+      totalCommissions: user.earnings  // Assuming earnings = total commissions
     });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ message: 'Server error' });
   }
 });
-
-
 
 module.exports = router;
