@@ -3,12 +3,12 @@ const router = express.Router();
 const User = require('../models/User');
 
 // Search by email to get referral code and stats
-router.get('/by-email', async (req, res) => {
+router.get('/by-code', async (req, res) => {
   try {
-    const email = req.query.email;
-    const user = await User.findOne({ email });
+    const code = req.query.code;
+    const user = await User.findOne({ ownReferralCode: code });
 
-    if (!user) return res.status(404).json({ message: 'User not found' });
+    if (!user) return res.status(404).json({ message: 'Referral code not found' });
 
     const invitedUsers = await User.find({ referralCode: user.ownReferralCode }).select('email createdAt');
 
@@ -22,6 +22,7 @@ router.get('/by-email', async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 });
+
 
 // Search directly by ownReferralCode
 router.get('/by-code', async (req, res) => {
