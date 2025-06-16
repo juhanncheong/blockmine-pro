@@ -3,6 +3,7 @@ const router = express.Router();
 const PendingDeposit = require("../models/PendingDeposit");
 const Deposit = require("../models/Deposit");
 const User = require("../models/User");
+const Transaction = require("../models/Transaction"); // ✅ <-- ADD THIS LINE
 
 // GET: fetch all pending deposits
 router.get("/", async (req, res) => {
@@ -34,10 +35,18 @@ router.post("/:id/approve", async (req, res) => {
       $inc: { balance: pending.creditBTC }
     });
 
-    // 3️⃣ Delete from pending list
+    // ✅ 3️⃣ Create transaction history for user wallet
+    await Transaction.create({
+      userId: pending.userId,
+      type: "deposit",
+      amount: pending.creditBTC,
+      createdAt: new Date()
+    });
+
+    // 4️⃣ Delete from pending list
     await PendingDeposit.findByIdAndDelete(pending._id);
 
-    res.json({ message: "Deposit approved & credited" });
+    res.json({ message: "Deposit approved, credited & added to transaction history" });
   } catch (err) {
     console.error("Approve Error:", err);
     res.status(500).json({ message: "Server error" });
