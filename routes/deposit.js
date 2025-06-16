@@ -64,4 +64,80 @@ router.post("/admin/deposit", async (req, res) => {
   }
 });
 
+// User submits deposit request (from frontend step 2)
+router.post("/", async (req, res) => {
+  try {
+    const { userId, coin, amountUSD, sendCoinAmount, creditBTC } = req.body;
+
+    if (!userId || !coin || !amountUSD || !sendCoinAmount || !creditBTC) {
+      return res.status(400).json({ message: "Missing fields" });
+    }
+
+    const newDeposit = new Deposit({
+      userId,
+      coin,
+      amountUSD,
+      sendCoinAmount,
+      creditBTC,
+      status: "pending"
+    });
+
+    await newDeposit.save();
+
+    res.json({ message: "Deposit request submitted" });
+  } catch (err) {
+    console.error("Error submitting deposit:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+router.post("/:id/approve", async (req, res) => {
+  try {
+    const deposit = await Deposit.findById(req.params.id);
+    if (!deposit) {
+      return res.status(404).json({ message: "Deposit not found" });
+    }
+
+    if (deposit.status !== "pending") {
+      return res.status(400).json({ message: "Deposit already processed" });
+    }
+
+    // ✅ Update deposit status
+    deposit.status = "approved";
+    await deposit.save();
+
+    // ✅ Credit user balance
+    await User.findByIdAndUpdate(deposit.userId, {
+      $inc: { balance: deposit.creditBTC }
+    });
+
+    res.json({ message: "Deposit approved and credited" });
+  } catch (err) {
+    console.error("Approve deposit error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+router.post("/:id/reject", async (req, res) => {
+  try {
+    const deposit = await Deposit.findById(req.params.id);
+    if (!deposit) {
+      return res.status(404).json({ message: "Deposit not found" });
+    }
+
+    if (deposit.status !== "pending") {
+      return res.status(400).json({ message: "Deposit already processed" });
+    }
+
+    // ✅ Update status only, no balance change
+    deposit.status = "rejected";
+    await deposit.save();
+
+    res.json({ message: "Deposit rejected" });
+  } catch (err) {
+    console.error("Reject deposit error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
 module.exports = router;
