@@ -10,12 +10,13 @@ router.get('/by-email', async (req, res) => {
 
     if (!user) return res.status(404).json({ message: 'User not found' });
 
-    const referralCount = await User.countDocuments({ referralCode: user.ownReferralCode });
+    const invitedUsers = await User.find({ referralCode: user.ownReferralCode }).select('email createdAt');
 
     res.json({
       email: user.email,
       ownReferralCode: user.ownReferralCode,
-      referralCount: referralCount
+      referralCount: invitedUsers.length,
+      invitedUsers: invitedUsers
     });
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
