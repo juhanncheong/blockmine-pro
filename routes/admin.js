@@ -7,7 +7,7 @@ const Withdrawal = require('../models/Withdrawal');
 const router = express.Router();
 const MiningPurchase = require('../models/MiningPurchase');
 const Package = require('../models/Package');
-const Deposit = require("../models/Deposit"); 
+const Deposit = require("../models/Deposit");
 
 // Admin login route
 router.post('/login', async (req, res) => {
@@ -227,6 +227,59 @@ router.post("/admin/deposit", async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server error" });
+  }
+});
+
+router.get('/user-packages/:userId', verifyAdminToken, async (req, res) => {
+  try {
+    const purchases = await MiningPurchase.find({ userId: req.params.userId }).populate('packageId');
+    res.json(purchases);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Failed to fetch user packages' });
+  }
+});
+
+router.post('/user-packages', verifyAdminToken, async (req, res) => {
+  const { userId, packageId } = req.body;
+
+  if (!userId || !packageId) {
+    return res.status(400).json({ message: 'Missing userId or packageId' });
+  }
+
+  try {
+    const pkg = await Package.findById(packageId);
+    if (!pkg) {
+      return res.status(404).json({ message: 'Package not found' });
+    }
+
+    await MiningPurchase.create({
+      userId,
+      packageId: pkg._id,
+      purchaseDate: new Date(),
+      earnings: 0,
+      isActive: true
+    });
+
+    res.json({ message: 'Package added to user successfully' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Failed to add package' });
+  }
+});
+
+router.delete('/user-packages/:purchaseId', verifyAdminToken, async (req, res) => {
+  try {
+    const deleted = await MiningPurchase.findByIdAndDelete(req.params.purchaseId);
+
+    if (!deleted) {
+      return res.status(404).json({ message: 'Purchase not found' });
+    }
+
+    res.json({ message: 'Package purchase deleted successfully' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Failed to delete package purchase' });
   }
 });
 
