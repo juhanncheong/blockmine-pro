@@ -5,36 +5,23 @@ const User = require('../models/User');
 // Search by email to get referral code and stats
 router.get('/by-email', async (req, res) => {
   try {
-    const rawEmail = req.query.email;
-    if (!rawEmail) return res.status(400).json({ message: 'Email required' });
-
-    const email = rawEmail.trim().toLowerCase();
-
+    const email = req.query.email;
     const user = await User.findOne({ email });
+
     if (!user) return res.status(404).json({ message: 'User not found' });
 
     const invitedUsers = await User.find({ referralCode: user.ownReferralCode }).select('email createdAt');
-
-    const totalCommissionResult = await Transaction.aggregate([
-      { $match: { userId: user._id, type: 'referral-commission' } },
-      { $group: { _id: null, total: { $sum: "$amount" } } }
-    ]);
-
-    const totalReferralCommission = (totalCommissionResult[0]?.total || 0).toFixed(8);
 
     res.json({
       email: user.email,
       ownReferralCode: user.ownReferralCode,
       referralCount: invitedUsers.length,
-      invitedUsers: invitedUsers,
-      totalReferralCommission: parseFloat(totalReferralCommission)
+      invitedUsers: invitedUsers
     });
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
   }
 });
-
-
 
 // Search directly by ownReferralCode
 router.get('/by-code', async (req, res) => {
