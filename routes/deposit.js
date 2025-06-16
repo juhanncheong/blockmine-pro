@@ -140,4 +140,13 @@ router.post("/:id/reject", async (req, res) => {
   }
 });
 
+router.get("/admin/pending", async (req, res) => {
+  try {
+    const pendingDeposits = await Deposit.find({ status: "pending" }).populate("userId");
+    res.json(pendingDeposits);
+  } catch (err) {
+    console.error("Failed to fetch pending deposits:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
 module.exports = router;
