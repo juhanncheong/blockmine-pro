@@ -86,9 +86,10 @@ router.post('/purchase', async (req, res) => {
 
     user.balance = parseFloat((user.balance - requiredBTC).toFixed(8));
     
-    // ✅ Handle referral commissions (clean BTC → BTC logic)
-if (user.referralCode) {
+    // ✅ Handle referral commissions (now fully safe against self-referral)
+  if (user.referralCode && user.referralCode !== user.ownReferralCode) {
   const inviter = await User.findOne({ ownReferralCode: user.referralCode });
+
   if (inviter) {
     const commissionBTC = parseFloat((requiredBTC * 0.15).toFixed(8));
 

@@ -31,6 +31,11 @@ router.post('/register', async (req, res) => {
     // Generate own referral code
     const ownReferralCode = generateReferralCode();
 
+    // Self-referral protection
+    if (referralCode && referralCode === ownReferralCode) {
+    return res.status(400).json({ message: 'You cannot use your own referral code.' });
+    }
+
     // Create new user
     const newUser = new User({
       username,
