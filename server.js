@@ -14,6 +14,7 @@ const referralRoutes = require('./routes/referral');
 const adminReferralRoutes = require('./routes/adminReferral');
 const adminStatsRoutes = require("./routes/adminStats");
 const adminManualDepositRoute = require("./routes/adminManualDeposit");
+const dashboardRoutes = require("./routes/dashboard");
 
 // Middleware
 app.use(express.json());
@@ -35,6 +36,7 @@ app.use('/api/admin/referral', adminReferralRoutes);
 app.use("/api/admin/pending-deposits", adminPendingDepositRoutes);
 app.use("/api/admin/stats", adminStatsRoutes);
 app.use("/api/admin/manual-deposit", adminManualDepositRoute);
+app.use("/api/dashboard", dashboardRoutes);
 
 // Simple test route
 app.get('/', (req, res) => {
