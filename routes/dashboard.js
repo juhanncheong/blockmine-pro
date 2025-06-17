@@ -3,20 +3,24 @@ const router = express.Router();
 const User = require("../models/User");
 const Withdrawal = require("../models/Withdrawal");
 const MiningPurchase = require("../models/MiningPurchase");
+const Package = require("../models/Package");
 
 router.get("/summary/:userId", async (req, res) => {
   try {
     const userId = req.params.userId;
 
-    // Load everything in parallel ✅
+    // Load user, withdrawals, and active mining purchases
     const [user, pendingWithdrawals, purchases] = await Promise.all([
       User.findById(userId),
       Withdrawal.countDocuments({ userId, status: "pending" }),
-      MiningPurchase.find({ userId, isActive: true }),
+      MiningPurchase.find({ userId, isActive: true }).populate("packageId")
     ]);
 
-    // ✅ Calculate total mining power from purchases
-    const miningPowerTotal = purchases.reduce((total, purchase) => total + (purchase.hashPower || 0), 0);
+    // Calculate total mining power by summing miningPower from linked Package
+    const miningPowerTotal = purchases.reduce((total, purchase) => {
+      const packagePower = purchase.packageId?.miningPower || 0;
+      return total + packagePower;
+    }, 0);
 
     res.json({
       btcBalance: user.balance || 0,
