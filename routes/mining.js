@@ -11,9 +11,14 @@ router.post('/run-daily-earnings', async (req, res) => {
   try {
     const earningRate = parseFloat(process.env.EARNING_RATE_USD_PER_THS); // USD per TH/s
 
-    // Get live BTC price
-    const priceRes = await axios.get('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd');
-    const btcPriceUSD = priceRes.data.bitcoin.usd;
+    // Get live BTC price with fallback
+let btcPriceUSD = 65000; // fallback value if API fails
+try {
+  const priceRes = await axios.get('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd');
+  btcPriceUSD = priceRes.data.bitcoin.usd;
+} catch (err) {
+  console.warn("⚠️ CoinGecko fetch failed. Using fallback price:", btcPriceUSD);
+}
 
     // Get all users
     const users = await User.find();
