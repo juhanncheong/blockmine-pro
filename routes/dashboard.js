@@ -4,6 +4,8 @@ const User = require("../models/User");
 const Withdrawal = require("../models/Withdrawal");
 const MiningPurchase = require("../models/MiningPurchase");
 const Package = require("../models/Package");
+const Transaction = require("../models/Transaction");
+const moment = require("moment");
 
 router.get("/summary/:userId", async (req, res) => {
   try {
@@ -35,4 +37,44 @@ router.get("/summary/:userId", async (req, res) => {
   }
 });
 
+// GET /api/dashboard/earnings/:userId
+router.get("/earnings/:userId", async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    const allEarnings = await Transaction.find({
+      userId,
+      type: "mining",
+    });
+
+    const totalEarnings = allEarnings.reduce((sum, tx) => sum + (tx.amount || 0), 0);
+
+    const today = moment().startOf("day");
+    const todayEarnings = allEarnings
+      .filter(tx => moment(tx.date).isSame(today, "day"))
+      .reduce((sum, tx) => sum + (tx.amount || 0), 0);
+
+    // Get last 7 days chart data
+    const chartData = [];
+    for (let i = 6; i >= 0; i--) {
+      const day = moment().subtract(i, "days").startOf("day");
+      const dailyEarnings = allEarnings
+        .filter(tx => moment(tx.date).isSame(day, "day"))
+        .reduce((sum, tx) => sum + (tx.amount || 0), 0);
+      chartData.push({
+        date: day.format("MMM D"),
+        amount: parseFloat(dailyEarnings.toFixed(6)),
+      });
+    }
+
+    res.json({
+      totalEarnings: parseFloat(totalEarnings.toFixed(6)),
+      todayEarnings: parseFloat(todayEarnings.toFixed(6)),
+      chartData,
+    });
+  } catch (err) {
+    console.error("❌ Failed to fetch earnings summary:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
 module.exports = router;
