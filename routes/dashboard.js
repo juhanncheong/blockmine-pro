@@ -15,9 +15,12 @@ router.get("/summary/:userId", async (req, res) => {
       MiningPurchase.find({ userId, isActive: true }),
     ]);
 
+    // ✅ Calculate total mining power from purchases
+    const miningPowerTotal = purchases.reduce((total, purchase) => total + (purchase.hashPower || 0), 0);
+
     res.json({
       btcBalance: user.balance || 0,
-      miningPower: user.miningPower || 0,  // you can adjust this depending where miningPower is stored
+      miningPower: miningPowerTotal,
       pendingWithdrawals: pendingWithdrawals || 0,
       activePackages: purchases.length || 0,
     });
