@@ -189,4 +189,40 @@ router.post('/admin/deposit', async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 });
+
+router.post('/cancel/:id', async (req, res) => {
+  try {
+    const deposit = await Deposit.findById(req.params.id);
+
+    if (!deposit) return res.status(404).json({ message: "Deposit not found" });
+    if (deposit.status !== 'pending') {
+      return res.status(400).json({ message: "Only pending deposits can be canceled" });
+    }
+
+    deposit.status = 'canceled';
+    await deposit.save();
+
+    res.json({ message: "Deposit canceled successfully" });
+  } catch (err) {
+    console.error("Cancel deposit error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// ✅ User Cancel Deposit Route
+router.post("/cancel/:id", async (req, res) => {
+  try {
+    const deposit = await Deposit.findById(req.params.id);
+    if (!deposit || deposit.status !== "pending") {
+      return res.status(400).json({ message: "Cannot cancel deposit" });
+    }
+    deposit.status = "rejected"; // Mark as failed after cancel
+    await deposit.save();
+    res.json({ message: "Deposit canceled" });
+  } catch (err) {
+    console.error("Failed to cancel deposit", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
 module.exports = router;
