@@ -1,9 +1,19 @@
 const express = require("express");
+const axios = require("axios");
 const router = express.Router();
 const User = require("../models/User");
 const Deposit = require("../models/Deposit");
 
-// Admin manual deposit route
+// ✅ Reuse your BTC price fetch logic
+async function fetchBTCPrice() {
+  const priceRes = await axios.get(
+    'https://api.allorigins.win/get?url=' +
+    encodeURIComponent('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd')
+  );
+  const parsed = JSON.parse(priceRes.data.contents);
+  return parsed.bitcoin.usd;
+}
+
 router.post("/", async (req, res) => {
   try {
     const { userId, amountBTC } = req.body;
@@ -12,25 +22,24 @@ router.post("/", async (req, res) => {
       return res.status(400).json({ message: "Invalid input" });
     }
 
-    // Find user
-    const user = await User.findById(userId);
-    if (!user) return res.status(404).json({ message: "User not found" });
+    // ✅ Get BTC price using your stable method
+    const btcPrice = await fetchBTCPrice();
 
-    // Add balance to user
-    user.balance += amountBTC;
-    await user.save();
-
-    // Log deposit history
     const deposit = new Deposit({
       userId,
-      amount: 0, // Because USD not used in manual deposits
+      coin: "BTC",
+      amountUSD: parseFloat((amountBTC * btcPrice).toFixed(2)),
+      sendCoinAmount: amountBTC,
       creditBTC: amountBTC,
-      status: "approved",  // Directly approved
+      status: "approved",
       createdAt: new Date()
     });
+
     await deposit.save();
 
-    res.json({ message: "Deposit added successfully" });
+    await User.findByIdAndUpdate(userId, { $inc: { balance: amountBTC } });
+
+    res.json({ message: "Manual deposit added successfully" });
   } catch (err) {
     console.error("Manual deposit failed", err);
     res.status(500).json({ message: "Server error" });
