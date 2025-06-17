@@ -160,4 +160,33 @@ router.get("/history/:userId", async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 });
+
+// Admin Manual Deposit creation
+router.post('/admin/deposit', async (req, res) => {
+  const { userId, amount } = req.body;
+
+  if (!userId || !amount) {
+    return res.status(400).json({ message: "Missing fields" });
+  }
+
+  try {
+    const deposit = new Deposit({
+      userId,
+      amountUSD: amount * (await getBTCPrice()),  // convert to USD based on BTC price
+      creditBTC: amount,  // direct BTC amount admin enters
+      status: 'approved',
+      createdAt: new Date()
+    });
+
+    await deposit.save();
+
+    // ✅ Directly update user balance:
+    await User.findByIdAndUpdate(userId, { $inc: { balance: amount } });
+
+    res.json({ message: "Deposit added successfully" });
+  } catch (err) {
+    console.error("Failed to add manual deposit:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
 module.exports = router;
