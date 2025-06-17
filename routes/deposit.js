@@ -149,4 +149,15 @@ router.get("/admin/pending", async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 });
+
+// User Deposit History
+router.get("/history/:userId", async (req, res) => {
+  try {
+    const deposits = await Deposit.find({ userId: req.params.userId }).sort({ createdAt: -1 });
+    res.json(deposits);
+  } catch (err) {
+    console.error("Failed to fetch deposit history:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
 module.exports = router;
