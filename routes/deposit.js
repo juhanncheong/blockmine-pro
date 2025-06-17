@@ -30,40 +30,6 @@ router.get("/admin/list", async (req, res) => {
   }
 });
 
-// ✅ Admin POST add deposit (deposit + balance + transaction record)
-router.post("/admin/deposit", async (req, res) => {
-  try {
-    const { userId, amount } = req.body;
-
-    const user = await User.findById(userId);
-    if (!user) return res.status(404).json({ message: "User not found" });
-
-    // Save deposit record
-    const newDeposit = new Deposit({
-      userId: user._id,
-      amount: parseFloat(amount),
-    });
-    await newDeposit.save();
-
-    // Update user balance
-    user.balance += parseFloat(amount);
-    await user.save();
-
-    // Create transaction record (this allows wallet.html to see deposit history)
-    const newTransaction = new Transaction({
-      userId: user._id,
-      type: "deposit",
-      amount: parseFloat(amount),
-    });
-    await newTransaction.save();
-
-    res.json({ message: "Deposit added successfully" });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Server error" });
-  }
-});
-
 // User submits deposit request (from frontend step 2)
 router.post("/", async (req, res) => {
   try {
