@@ -17,7 +17,7 @@ router.get("/summary/:userId", async (req, res) => {
 
     res.json({
       btcBalance: user.balance || 0,
-      miningPower: user.earnings || 0,  // you can adjust this depending where miningPower is stored
+      miningPower: user.miningPower || 0,  // you can adjust this depending where miningPower is stored
       pendingWithdrawals: pendingWithdrawals || 0,
       activePackages: purchases.length || 0,
     });
