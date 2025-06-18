@@ -46,6 +46,7 @@ try {
 
       // Add total earnings to user's wallet
       user.balance += totalEarningsBTC;
+      user.earnings = (user.earnings || 0) + totalEarningsBTC;
       await user.save();
 
       console.log(`User ${user.username} earned ${totalEarningsBTC.toFixed(8)} BTC today.`)
