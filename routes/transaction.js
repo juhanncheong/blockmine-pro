@@ -2,7 +2,8 @@ const express = require("express");
 const router = express.Router();
 const Transaction = require("../models/Transaction");
 
-// GET transactions with pagination
+// GET /api/transactions/:userId?page=1&limit=5
+// Fetch paginated transactions for a user
 router.get("/:userId", async (req, res) => {
   const { page = 1, limit = 5 } = req.query;
 
@@ -16,7 +17,7 @@ router.get("/:userId", async (req, res) => {
 
     res.json({ transactions, total });
   } catch (err) {
-    console.error(err);
+    console.error("Failed to fetch transactions:", err);
     res.status(500).json({ message: "Server error" });
   }
 });

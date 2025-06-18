@@ -9,13 +9,13 @@ const app = express();
 const walletRoutes = require("./routes/wallet");
 const depositRoutes = require("./routes/deposit");
 const adminPendingDepositRoutes = require("./routes/adminPendingDeposit");
-const transactionRoutes = require("./routes/transaction");
 const referralRoutes = require('./routes/referral');
 const adminReferralRoutes = require('./routes/adminReferral');
 const adminStatsRoutes = require("./routes/adminStats");
 const adminManualDepositRoute = require("./routes/adminManualDeposit");
 const dashboardRoutes = require("./routes/dashboard");
 const minersRoutes = require("./routes/miners");
+const transactionsRoute = require("./routes/transactions");
 
 // Middleware
 app.use(express.json());
@@ -31,7 +31,6 @@ app.use('/api/withdrawal', withdrawalRoutes);
 app.use('/api/admin', adminRoutes);
 app.use("/api/wallet", walletRoutes);
 app.use("/api/deposit", depositRoutes);
-app.use("/api/transactions", transactionRoutes);
 app.use('/api/referral', referralRoutes);
 app.use('/api/admin/referral', adminReferralRoutes);
 app.use("/api/admin/pending-deposits", adminPendingDepositRoutes);
@@ -39,6 +38,8 @@ app.use("/api/admin/stats", adminStatsRoutes);
 app.use("/api/admin/manual-deposit", adminManualDepositRoute);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/miners", minersRoutes);
+app.use("/api/transactions", transactionsRoute);
+
 // Simple test route
 app.get('/', (req, res) => {
   res.send('BlockMine Pro Backend Running ✅');
