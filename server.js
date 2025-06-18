@@ -16,6 +16,7 @@ const adminStatsRoutes = require("./routes/adminStats");
 const adminManualDepositRoute = require("./routes/adminManualDeposit");
 const dashboardRoutes = require("./routes/dashboard");
 const minersRoutes = require("./routes/miners");
+const bmtRoutes = require('./routes/bmt');
 
 // Middleware
 app.use(express.json());
@@ -41,6 +42,7 @@ app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/miners", minersRoutes);
 app.use('/api/token', require('./routes/token'));
 app.use('/api/settings', require('./routes/settings'));
+app.use('/api', bmtRoutes);
 
 // Simple test route
 app.get('/', (req, res) => {
