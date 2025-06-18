@@ -62,8 +62,8 @@ cron.schedule('0 0 * * *', async () => {
 
   try {
     const earningRate = parseFloat(process.env.EARNING_RATE_USD_PER_THS);
-    const priceRes = await axios.get('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd');
-    const btcPriceUSD = priceRes.data.bitcoin.usd;
+    const priceRes = await axios.get('https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT');
+    const btcPriceUSD = parseFloat(priceRes.data.price);
 
     const users = await User.find();
 
