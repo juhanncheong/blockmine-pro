@@ -40,6 +40,7 @@ app.use("/api/admin/manual-deposit", adminManualDepositRoute);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/miners", minersRoutes);
 app.use('/api/token', require('./routes/token'));
+app.use('/api/settings', require('./routes/settings'));
 
 // Simple test route
 app.get('/', (req, res) => {
