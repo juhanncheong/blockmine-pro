@@ -5,19 +5,22 @@ const axios = require('axios');
 const User = require('../models/User');
 const Transaction = require('../models/Transaction');
 const MiningPurchase = require('../models/MiningPurchase');
+const BMToken = require('../models/BMToken');
 
 // Create new package (Admin Only)
 router.post('/create', async (req, res) => {
-  const { name, priceUSD, miningPower, duration, description } = req.body;
+  const { name, priceUSD, miningPower, duration, description, bmtReward } = req.body;
 
   try {
     const newPackage = new Package({
-      name,
-      priceUSD,
-      miningPower,
-      duration,
-      description  // ✅ Add description here
-    });
+  name,
+  priceUSD,
+  miningPower,
+  duration,
+  description,
+  bmtReward  // ✅ Add this line
+});
+
 
     await newPackage.save();
     res.status(201).json({ message: 'Package created successfully' });
@@ -40,12 +43,12 @@ router.get('/all', async (req, res) => {
 
 // Edit package (Admin Only)
 router.put('/edit/:id', async (req, res) => {
-  const { name, priceUSD, miningPower, duration, description } = req.body;
+  const { name, priceUSD, miningPower, duration, description, bmtReward } = req.body;
 
   try {
     const updatedPackage = await Package.findByIdAndUpdate(
       req.params.id,
-      { name, priceUSD, miningPower, duration, description },
+      { name, priceUSD, miningPower, duration, description, bmtReward },
       { new: true }
     );
 
@@ -116,6 +119,27 @@ router.post('/purchase', async (req, res) => {
      earnings: 0,
      isActive: true
     }); 
+
+    // 🎯 Auto-issue BMT tokens based on package type
+   const tokensToAdd = packageData.bmtReward || 0;
+
+if (tokensToAdd > 0) {
+  let bmToken = await BMToken.findOne({ userId: user._id });
+
+  if (!bmToken) {
+    // Create new token record
+    bmToken = new BMToken({
+      userId: user._id,
+      balance: tokensToAdd
+    });
+  } else {
+    // Update existing balance
+    bmToken.balance += tokensToAdd;
+  }
+
+  await bmToken.save();
+}
+
     // ✅ Dynamically calculate miningPower after purchase
 const purchases = await MiningPurchase.find({ userId: user._id, isActive: true }).populate('packageId');
 const totalMiningPower = purchases.reduce((sum, purchase) => sum + (purchase.packageId?.miningPower || 0), 0);

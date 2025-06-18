@@ -5,8 +5,9 @@ const packageSchema = new mongoose.Schema({
   priceUSD: { type: Number, required: true },       // Fixed price in USD
   miningPower: { type: Number, required: true },    // Mining power (TH/s)
   duration: { type: Number, required: true },       // Duration in days
-  createdAt: { type: Date, default: Date.now },
-  description: String
+  description: String,                              // Optional description
+  bmtReward: { type: Number, default: 0 },          // ✅ Tokens rewarded
+  createdAt: { type: Date, default: Date.now }
 });
 
 module.exports = mongoose.model('Package', packageSchema);
