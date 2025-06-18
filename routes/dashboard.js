@@ -28,6 +28,7 @@ router.get("/summary/:userId", async (req, res) => {
       btcBalance: user.balance || 0,
       miningPower: miningPowerTotal,
       pendingWithdrawals: pendingWithdrawals || 0,
+      bmtBalance: user.bmtBalance || 0, // ✅ Add this line
       activePackages: purchases.length || 0,
     });
 
