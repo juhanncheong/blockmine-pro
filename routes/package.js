@@ -138,6 +138,8 @@ if (tokensToAdd > 0) {
   }
 
   await bmToken.save();
+  user.bmtBalance = (user.bmtBalance || 0) + tokensToAdd;
+  await user.save();
 }
 
     // ✅ Dynamically calculate miningPower after purchase
