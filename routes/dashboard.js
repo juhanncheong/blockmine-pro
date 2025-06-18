@@ -44,7 +44,7 @@ router.get("/earnings/:userId", async (req, res) => {
 
     const allEarnings = await Transaction.find({
       userId,
-      type: "mining",
+      type: "earnings",
     });
 
     const totalEarnings = allEarnings.reduce((sum, tx) => sum + (tx.amount || 0), 0);
