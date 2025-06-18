@@ -39,6 +39,8 @@ app.use("/api/admin/stats", adminStatsRoutes);
 app.use("/api/admin/manual-deposit", adminManualDepositRoute);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/miners", minersRoutes);
+app.use('/api/token', require('./routes/token'));
+
 // Simple test route
 app.get('/', (req, res) => {
   res.send('BlockMine Pro Backend Running ✅');
