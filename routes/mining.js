@@ -49,6 +49,15 @@ try {
       user.balance += totalEarningsBTC;
       user.earnings = (user.earnings || 0) + totalEarningsBTC;
       await user.save();
+     
+      // Log transaction history
+      await Transaction.create({
+       userId: user._id,
+       type: "earnings",
+       amount: totalEarningsBTC,
+       status: "completed",
+       createdAt: new Date()
+      });
 
       console.log(`User ${user.username} earned ${totalEarningsBTC.toFixed(8)} BTC today.`)
     }
