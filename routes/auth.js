@@ -87,7 +87,8 @@ router.post('/login', async (req, res) => {
         earnings: user.earnings,
         miningPower: totalMiningPower, 
         referralCode: user.referralCode,
-        ownReferralCode: user.ownReferralCode
+        ownReferralCode: user.ownReferralCode,
+        bmtBalance: user.bmtBalance || 0
       }
     });
 

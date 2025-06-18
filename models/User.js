@@ -9,6 +9,7 @@ const userSchema = new mongoose.Schema({
 
   earnings: { type: Number, default: 0 }, // Total mined
   balance: { type: Number, default: 0 },  // Available wallet balance
+  bmtBalance: { type: Number, default: 0 },  
   totalWithdrawn: { type: Number, default: 0 },
 
   createdAt: { type: Date, default: Date.now },
