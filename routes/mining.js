@@ -6,6 +6,7 @@ require('dotenv').config();
 const MiningPurchase = require('../models/MiningPurchase');
 const router = express.Router();
 const Package = require('../models/Package');
+const Transaction = require('../models/Transaction');
 
 router.post('/run-daily-earnings', async (req, res) => {
   try {
