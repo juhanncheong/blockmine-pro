@@ -85,4 +85,22 @@ router.post('/cleanup-expired', async (req, res) => {
     res.status(500).json({ message: 'Server error while cleaning expired purchases' });
   }
 });
+
+// Get daily earnings history for a user
+router.get("/earnings-history/:userId", async (req, res) => {
+  try {
+    const userId = req.params.userId;
+
+    const earnings = await Transaction.find({
+      userId,
+      type: "earnings",
+    }).sort({ createdAt: -1 });
+
+    res.json(earnings);
+  } catch (err) {
+    console.error("❌ Failed to get earnings history", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
 module.exports = router;
