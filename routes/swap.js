@@ -3,9 +3,8 @@ const router = express.Router();
 const User = require("../models/User");
 const Transaction = require("../models/Transaction");
 const BMTPriceHistory = require("../models/BMTPriceHistory");
-const authMiddleware = require("../middleware/auth");
 
-router.post("/api/swap", authMiddleware, async (req, res) => {
+router.post("/api/swap", async (req, res) => {
   try {
     const { amount } = req.body;
     const userId = req.user.userId;
