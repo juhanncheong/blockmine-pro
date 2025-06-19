@@ -48,6 +48,35 @@ router.post("/api/stake", async (req, res) => {
   }
 });
 
+// ✅ FIRST define fixed routes
+router.get("/api/stake/process-expired", async (req, res) => {
+  try {
+    const expiredStakes = await Stake.find({
+      active: true,
+      endDate: { $lte: new Date() },
+      credited: false,
+    });
+
+    for (const stake of expiredStakes) {
+      const user = await User.findById(stake.userId);
+      const totalReward = stake.dailyReward * 14;
+
+      user.bmtBalance += stake.amount + totalReward;
+      await user.save();
+
+      stake.active = false;
+      stake.credited = true;
+      stake.refunded = true;
+      await stake.save();
+    }
+
+    res.json({ message: "Processed all expired stakes." });
+  } catch (err) {
+    console.error("Stake processing error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 router.get("/api/stake/:userId", async (req, res) => {
   try {
     const userId = req.params.userId;
@@ -87,36 +116,6 @@ if (stake.unlockDate <= now && stake.active) {
   } catch (err) {
     console.error("Fetch stake history error:", err);
     res.status(500).json({ message: "Server error" });
-  }
-});
-
-
-// ✅ FIRST define fixed routes
-router.get("/api/stake/process-expired", async (req, res) => {
-  try {
-    const expiredStakes = await Stake.find({
-      active: true,
-      endDate: { $lte: new Date() },
-      credited: false,
-    });
-
-    for (const stake of expiredStakes) {
-      const user = await User.findById(stake.userId);
-      const totalReward = stake.dailyReward * 14;
-
-      user.bmtBalance += stake.amount + totalReward;
-      await user.save();
-
-      stake.active = false;
-      stake.credited = true;
-      stake.refunded = true;
-      await stake.save();
-    }
-
-    res.json({ message: "Processed all expired stakes." });
-  } catch (err) {
-    console.error("Stake processing error:", err);
-    res.status(500).json({ error: "Internal server error" });
   }
 });
 
