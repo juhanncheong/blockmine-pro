@@ -2,9 +2,8 @@ const express = require("express");
 const router = express.Router();
 const Stake = require("../models/Stake");
 const User = require("../models/User");
-const auth = require("../middleware/auth");
 
-router.post("/api/stake", auth, async (req, res) => {
+router.post("/api/stake", async (req, res) => {
   try {
     const { amount } = req.body;
     const userId = req.user.userId;
