@@ -1,3 +1,10 @@
+const express = require("express");
+const router = express.Router();
+const User = require("../models/User"); // or wherever your User model is
+const Transaction = require("../models/Transaction");
+const BMTPrice = require("../models/BMTPrice"); // if using
+const authMiddleware = require("../middleware/auth"); // if using auth
+
 router.post("/api/swap", authMiddleware, async (req, res) => {
   try {
     const { amount } = req.body;
@@ -55,3 +62,5 @@ router.post("/api/swap", authMiddleware, async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 });
+
+module.exports = router;
