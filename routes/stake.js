@@ -90,4 +90,37 @@ if (stake.unlockDate <= now && stake.active) {
   }
 });
 
+
+// ✅ Auto process expired stakes (capital + reward)
+router.get("/api/stake/process-expired", async (req, res) => {
+  try {
+    const now = new Date();
+
+    const expiredStakes = await Stake.find({
+      active: true,
+      unlockDate: { $lte: now },
+      credited: false
+    });
+
+    for (const stake of expiredStakes) {
+      const user = await User.findById(stake.userId);
+      if (!user) continue;
+
+      const reward = stake.dailyReward * 14;
+      const total = stake.amount + reward;
+
+      user.bmtBalance += total;
+      await user.save();
+
+      stake.active = false;
+      stake.credited = true;
+      await stake.save();
+    }
+
+    res.json({ message: "Expired stakes processed", count: expiredStakes.length });
+  } catch (err) {
+    console.error("Auto stake processor error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
 module.exports = router;
