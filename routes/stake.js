@@ -78,38 +78,33 @@ router.get("/api/stake/process-expired", async (req, res) => {
 });
 
 router.get("/api/stake/:userId", async (req, res) => {
-  try {
-    const userId = req.params.userId;
-    const now = new Date();
+  const { userId } = req.params;
 
+  try {
+    const now = new Date();
     const user = await User.findById(userId);
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    // Fetch all user stakes
     const stakes = await Stake.find({ userId }).sort({ startDate: -1 });
 
     for (const stake of stakes) {
-      // Check if stake expired and not refunded
-if (stake.unlockDate <= now && stake.active) {
-  // Refund capital if not refunded
-  if (!stake.refunded) {
-    user.bmtBalance += stake.amount;
-    stake.refunded = true;
-  }
+      if (stake.active && stake.unlockDate <= now) {
+        if (!stake.refunded) {
+          user.bmtBalance += stake.amount;
+          stake.refunded = true;
+        }
 
-  // Credit earnings if not yet credited
-  if (!stake.credited) {
-    const totalEarnings = stake.dailyReward * 14;
-    user.bmtBalance += totalEarnings;
-    stake.credited = true;
-  }
+        if (!stake.credited) {
+          user.bmtBalance += stake.dailyReward * 14;
+          stake.credited = true;
+        }
 
-  stake.active = false;
-  await stake.save();
-}
+        stake.active = false;
+        await stake.save();
+        await user.save();
+      }
     }
 
-    // Return updated list
     const updatedStakes = await Stake.find({ userId }).sort({ startDate: -1 });
     res.json(updatedStakes);
 
@@ -119,33 +114,4 @@ if (stake.unlockDate <= now && stake.active) {
   }
 });
 
-// ✅ THEN define dynamic route AFTER
-router.get("/api/stake/:userId", async (req, res) => {
-  const { userId } = req.params;
-
-  try {
-    const stakes = await Stake.find({ userId }).sort({ createdAt: -1 });
-
-    for (const stake of stakes) {
-      if (stake.active && new Date(stake.endDate) <= new Date() && !stake.credited) {
-        const user = await User.findById(stake.userId);
-        const totalReward = stake.dailyReward * 14;
-
-        user.bmtBalance += stake.amount + totalReward;
-        await user.save();
-
-        stake.active = false;
-        stake.credited = true;
-        stake.refunded = true;
-        await stake.save();
-      }
-    }
-
-    const updatedStakes = await Stake.find({ userId }).sort({ createdAt: -1 });
-    res.json(updatedStakes);
-  } catch (err) {
-    console.error("Fetch stake history error:", err);
-    res.status(500).json({ error: "Server error" });
-  }
-});
 module.exports = router;
