@@ -4,7 +4,7 @@ const User = require("../models/User");
 const Transaction = require("../models/Transaction");
 const BMTPriceHistory = require("../models/BMTPriceHistory");
 
-router.post("/api/swap", async (req, res) => {
+router.post("/swap", async (req, res) => {
   try {
     const { userId, amount } = req.body;
 
