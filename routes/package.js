@@ -5,7 +5,6 @@ const axios = require('axios');
 const User = require('../models/User');
 const Transaction = require('../models/Transaction');
 const MiningPurchase = require('../models/MiningPurchase');
-const BMToken = require('../models/BMToken');
 
 // Create new package (Admin Only)
 router.post('/create', async (req, res) => {
@@ -121,23 +120,9 @@ router.post('/purchase', async (req, res) => {
     }); 
 
     // 🎯 Auto-issue BMT tokens based on package type
-   const tokensToAdd = packageData.bmtReward || 0;
+const tokensToAdd = packageData.bmtReward || 0;
 
 if (tokensToAdd > 0) {
-  let bmToken = await BMToken.findOne({ userId: user._id });
-
-  if (!bmToken) {
-    // Create new token record
-    bmToken = new BMToken({
-      userId: user._id,
-      balance: tokensToAdd
-    });
-  } else {
-    // Update existing balance
-    bmToken.balance += tokensToAdd;
-  }
-
-  await bmToken.save();
   user.bmtBalance = (user.bmtBalance || 0) + tokensToAdd;
   await user.save();
 }
