@@ -61,16 +61,24 @@ router.get("/api/stake/:userId", async (req, res) => {
 
     for (const stake of stakes) {
       // Check if stake expired and not refunded
-      if (stake.unlockDate <= now && stake.active && !stake.refunded) {
-        // Refund BMT
-        user.bmtBalance += stake.amount;
-        stake.active = false;
-        stake.refunded = true;
-        await stake.save();
-      }
-    }
+if (stake.unlockDate <= now && stake.active) {
+  // Refund capital if not refunded
+  if (!stake.refunded) {
+    user.bmtBalance += stake.amount;
+    stake.refunded = true;
+  }
 
-    await user.save();
+  // Credit earnings if not yet credited
+  if (!stake.credited) {
+    const totalEarnings = stake.dailyReward * 14;
+    user.bmtBalance += totalEarnings;
+    stake.credited = true;
+  }
+
+  stake.active = false;
+  await stake.save();
+}
+    }
 
     // Return updated list
     const updatedStakes = await Stake.find({ userId }).sort({ startDate: -1 });

@@ -7,7 +7,8 @@ const stakeSchema = new mongoose.Schema({
   startDate: { type: Date, default: Date.now },
   unlockDate: { type: Date, required: true },
   active: { type: Boolean, default: true },
-  refunded: { type: Boolean, default: false }
+  refunded: { type: Boolean, default: false },
+  credited: { type: Boolean, default: false }
 });
 
 module.exports = mongoose.model("Stake", stakeSchema);
