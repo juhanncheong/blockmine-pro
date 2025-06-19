@@ -282,4 +282,46 @@ router.delete('/user-packages/:purchaseId', verifyAdminToken, async (req, res) =
   }
 });
 
+// Admin: Get user BMT balance by email
+router.get('/user-bmt', verifyAdminToken, async (req, res) => {
+  const { email } = req.query;
+  if (!email) return res.status(400).json({ message: 'Email is required' });
+
+  try {
+    const user = await User.findOne({ email });
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    res.json({
+      userId: user._id,
+      email: user.email,
+      bmtBalance: user.bmtBalance || 0,
+    });
+  } catch (err) {
+    console.error('Failed to fetch user BMT', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Admin: Adjust BMT balance (add or subtract)
+router.post('/adjust-bmt', verifyAdminToken, async (req, res) => {
+  const { userId, amount } = req.body;
+
+  if (!userId || typeof amount !== 'number') {
+    return res.status(400).json({ message: 'Missing userId or invalid amount' });
+  }
+
+  try {
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    user.bmtBalance = (user.bmtBalance || 0) + amount;
+    await user.save();
+
+    res.json({ message: 'BMT balance updated', bmtBalance: user.bmtBalance });
+  } catch (err) {
+    console.error('Failed to adjust BMT balance', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 module.exports = router;
