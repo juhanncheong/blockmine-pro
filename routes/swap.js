@@ -1,0 +1,57 @@
+router.post("/api/swap", authMiddleware, async (req, res) => {
+  try {
+    const { amount } = req.body;
+    const userId = req.user.userId;
+
+    if (!amount || amount <= 0) {
+      return res.status(400).json({ message: "Invalid amount" });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    if (user.bmtBalance < amount) {
+      return res.status(400).json({ message: "Insufficient BMT balance" });
+    }
+
+    // Fetch latest BMT/USD price from DB
+    const bmtPriceData = await BMTPrice.find().sort({ date: 1 });
+    const latestBMT = bmtPriceData[bmtPriceData.length - 1];
+    const bmtUsd = parseFloat(latestBMT.price);
+
+    // Fetch BTC/USD from Binance
+    const btcRes = await fetch("https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT");
+    const btcData = await btcRes.json();
+    const btcUsd = parseFloat(btcData.price);
+
+    // Calculate BTC to give
+    const usdValue = amount * bmtUsd;
+    const btcAmount = usdValue / btcUsd;
+
+    // Update balances
+    user.bmtBalance -= amount;
+    user.balance += btcAmount;
+    await user.save();
+
+    // Save transaction (you’ll need to create the model if not yet)
+    const tx = new Transaction({
+      userId,
+      type: "swap",
+      bmtAmount: amount,
+      btcAmount,
+      usdValue,
+    });
+    await tx.save();
+
+    res.json({
+      message: "Swap successful",
+      newBMT: user.bmtBalance,
+      newBTC: user.balance,
+      receivedBTC: btcAmount,
+    });
+
+  } catch (err) {
+    console.error("Swap error", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
