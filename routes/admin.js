@@ -324,4 +324,29 @@ router.post('/adjust-bmt', verifyAdminToken, async (req, res) => {
   }
 });
 
+const Stake = require("../models/Stake");
+
+// Admin: View all stakes (optionally filter by user email)
+router.get("/stakes", verifyAdminToken, async (req, res) => {
+  const { email } = req.query;
+
+  try {
+    let userFilter = {};
+    if (email) {
+      const user = await User.findOne({ email });
+      if (!user) return res.status(404).json({ message: "User not found" });
+      userFilter.userId = user._id;
+    }
+
+    const stakes = await Stake.find(userFilter)
+      .sort({ startDate: -1 })
+      .populate("userId", "email");
+
+    res.json(stakes);
+  } catch (err) {
+    console.error("Failed to fetch stakes", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
 module.exports = router;
