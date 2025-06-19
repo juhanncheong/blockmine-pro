@@ -6,7 +6,7 @@ const User = require("../models/User");
 router.post("/api/stake", async (req, res) => {
   try {
     const { amount } = req.body;
-    const userId = req.user.userId;
+    const userId = req.body.userId;
 
     if (!amount || amount <= 0) {
       return res.status(400).json({ message: "Invalid amount" });
