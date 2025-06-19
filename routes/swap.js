@@ -6,11 +6,10 @@ const BMTPriceHistory = require("../models/BMTPriceHistory");
 
 router.post("/api/swap", async (req, res) => {
   try {
-    const { amount } = req.body;
-    const userId = req.user.userId;
+    const { userId, amount } = req.body;
 
-    if (!amount || amount <= 0) {
-      return res.status(400).json({ message: "Invalid amount" });
+    if (!userId || !amount || amount <= 0) {
+      return res.status(400).json({ message: "Invalid user or amount" });
     }
 
     const user = await User.findById(userId);
@@ -20,12 +19,12 @@ router.post("/api/swap", async (req, res) => {
       return res.status(400).json({ message: "Insufficient BMT balance" });
     }
 
-    // Fetch latest BMT/USD price from DB
-    const bmtPriceData = await BMTPrice.find().sort({ date: 1 });
+    // Get latest BMT price
+    const bmtPriceData = await BMTPriceHistory.find().sort({ date: 1 });
     const latestBMT = bmtPriceData[bmtPriceData.length - 1];
     const bmtUsd = parseFloat(latestBMT.price);
 
-    // Fetch BTC/USD from Binance
+    // Get BTC price from Binance
     const btcRes = await fetch("https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT");
     const btcData = await btcRes.json();
     const btcUsd = parseFloat(btcData.price);
@@ -34,12 +33,12 @@ router.post("/api/swap", async (req, res) => {
     const usdValue = amount * bmtUsd;
     const btcAmount = usdValue / btcUsd;
 
-    // Update balances
+    // Update user balances
     user.bmtBalance -= amount;
     user.balance += btcAmount;
     await user.save();
 
-    // Save transaction (you’ll need to create the model if not yet)
+    // Save transaction
     const tx = new Transaction({
       userId,
       type: "swap",
