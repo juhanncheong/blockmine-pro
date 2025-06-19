@@ -1,9 +1,9 @@
 const express = require("express");
 const router = express.Router();
-const User = require("../models/User"); // or wherever your User model is
+const User = require("../models/User");
 const Transaction = require("../models/Transaction");
-const BMTPrice = require("../models/BMTPrice"); // if using
-const authMiddleware = require("../middleware/auth"); // if using auth
+const BMTPriceHistory = require("../models/BMTPriceHistory");
+const authMiddleware = require("../middleware/auth");
 
 router.post("/api/swap", authMiddleware, async (req, res) => {
   try {
