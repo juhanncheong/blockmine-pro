@@ -91,36 +91,62 @@ if (stake.unlockDate <= now && stake.active) {
 });
 
 
-// ✅ Auto process expired stakes (capital + reward)
+// ✅ FIRST define fixed routes
 router.get("/api/stake/process-expired", async (req, res) => {
   try {
-    const now = new Date();
-
     const expiredStakes = await Stake.find({
       active: true,
-      unlockDate: { $lte: now },
-      credited: false
+      endDate: { $lte: new Date() },
+      credited: false,
     });
 
     for (const stake of expiredStakes) {
       const user = await User.findById(stake.userId);
-      if (!user) continue;
+      const totalReward = stake.dailyReward * 14;
 
-      const reward = stake.dailyReward * 14;
-      const total = stake.amount + reward;
-
-      user.bmtBalance += total;
+      user.bmtBalance += stake.amount + totalReward;
       await user.save();
 
       stake.active = false;
       stake.credited = true;
+      stake.refunded = true;
       await stake.save();
     }
 
-    res.json({ message: "Expired stakes processed", count: expiredStakes.length });
+    res.json({ message: "Processed all expired stakes." });
   } catch (err) {
-    console.error("Auto stake processor error:", err);
-    res.status(500).json({ message: "Server error" });
+    console.error("Stake processing error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ✅ THEN define dynamic route AFTER
+router.get("/api/stake/:userId", async (req, res) => {
+  const { userId } = req.params;
+
+  try {
+    const stakes = await Stake.find({ userId }).sort({ createdAt: -1 });
+
+    for (const stake of stakes) {
+      if (stake.active && new Date(stake.endDate) <= new Date() && !stake.credited) {
+        const user = await User.findById(stake.userId);
+        const totalReward = stake.dailyReward * 14;
+
+        user.bmtBalance += stake.amount + totalReward;
+        await user.save();
+
+        stake.active = false;
+        stake.credited = true;
+        stake.refunded = true;
+        await stake.save();
+      }
+    }
+
+    const updatedStakes = await Stake.find({ userId }).sort({ createdAt: -1 });
+    res.json(updatedStakes);
+  } catch (err) {
+    console.error("Fetch stake history error:", err);
+    res.status(500).json({ error: "Server error" });
   }
 });
 module.exports = router;
