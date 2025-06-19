@@ -72,13 +72,9 @@ router.post('/purchase', async (req, res) => {
     const packageData = await Package.findById(packageId);
     if (!packageData) return res.status(404).json({ message: 'Package not found' });
 
-    // ✅ Fetch live BTC price via AllOrigins proxy
-    const priceRes = await axios.get(
-      'https://api.allorigins.win/get?url=' +
-      encodeURIComponent('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd')
-    );
-    const parsed = JSON.parse(priceRes.data.contents);
-    const btcPriceUSD = parsed.bitcoin.usd;
+    // ✅ Fetch live BTC price from Binance
+    const priceRes = await axios.get('https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT');
+    const btcPriceUSD = parseFloat(priceRes.data.price);
 
     const requiredBTC = parseFloat((packageData.priceUSD / btcPriceUSD).toFixed(8));
 

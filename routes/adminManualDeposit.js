@@ -6,12 +6,8 @@ const Deposit = require("../models/Deposit");
 
 // ✅ Reuse your BTC price fetch logic
 async function fetchBTCPrice() {
-  const priceRes = await axios.get(
-    'https://api.allorigins.win/get?url=' +
-    encodeURIComponent('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd')
-  );
-  const parsed = JSON.parse(priceRes.data.contents);
-  return parsed.bitcoin.usd;
+  const priceRes = await axios.get('https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT');
+  return parseFloat(priceRes.data.price);
 }
 
 router.post("/", async (req, res) => {
