@@ -349,4 +349,24 @@ router.get("/stakes", verifyAdminToken, async (req, res) => {
   }
 });
 
+router.get('/bmt-stats', verifyAdminToken, async (req, res) => {
+  try {
+    const users = await User.find({}, "bmtBalance email");
+    const totalBMT = users.reduce((sum, u) => sum + (u.bmtBalance || 0), 0);
+
+    const topHolder = users.sort((a, b) => (b.bmtBalance || 0) - (a.bmtBalance || 0))[0];
+
+    res.json({
+      totalBMT,
+      topHolder: {
+        email: topHolder?.email || "N/A",
+        bmtBalance: topHolder?.bmtBalance || 0,
+      },
+    });
+  } catch (err) {
+    console.error("Failed to fetch BMT stats", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
 module.exports = router;
