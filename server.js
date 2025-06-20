@@ -64,30 +64,9 @@ mongoose.connect(process.env.MONGO_URI, {
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 
-// Auto Mining Scheduler — runs daily at 00:00 UTC
-cron.schedule('0 0 * * *', async () => {
-  console.log('Running daily mining earnings...');
+const { runDailyEarnings } = require('./utils/miningJobs');
 
-  try {
-    const earningRate = parseFloat(process.env.EARNING_RATE_USD_PER_THS);
-    const priceRes = await axios.get('https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT');
-    const btcPriceUSD = parseFloat(priceRes.data.price);
-
-    const users = await User.find();
-
-    for (let user of users) {
-      if (user.miningPower > 0) {
-        const earningsUSD = user.miningPower * earningRate;
-        const earningsBTC = earningsUSD / btcPriceUSD;
-
-        user.balance += earningsBTC;
-        await user.save();
-
-        console.log(`User ${user.username} earned ${earningsBTC.toFixed(8)} BTC today.`);
-      }
-    }
-
-  } catch (err) {
-    console.error('Mining job failed:', err);
-  }
+cron.schedule('* * * * *', async () => {
+  console.log("⏱ Running daily mining earnings...");
+  await runDailyEarnings();
 });
