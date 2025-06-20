@@ -66,7 +66,7 @@ app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 
 const { runDailyEarnings } = require('./utils/miningJobs');
 
-cron.schedule('* * * * *', async () => {
+cron.schedule('0 0 * * *', async () => {
   console.log("⏱ Running daily mining earnings...");
   await runDailyEarnings();
 });
