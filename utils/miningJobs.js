@@ -21,6 +21,8 @@ async function runDailyEarnings() {
 
     for (let user of users) {
       const activePurchases = await MiningPurchase.find({ userId: user._id, isActive: true }).populate('packageId');
+     
+      const now = new Date();
 
       let totalEarningsBTC = 0;
 
@@ -28,6 +30,29 @@ async function runDailyEarnings() {
         const power = purchase.packageId.miningPower;
         const earningsUSD = power * earningRate;
         const earningsBTC = earningsUSD / btcPriceUSD;
+        const purchaseDate = new Date(purchase.purchaseDate);
+const durationDays = purchase.packageId.duration || 60;
+const expiryDate = new Date(purchaseDate.getTime() + durationDays * 24 * 60 * 60 * 1000);
+
+if (now >= expiryDate) {
+  // mark as inactive
+  purchase.isActive = false;
+
+  // refund original capital in BTC
+  const refundBTC = purchase.packageId.priceUSD / btcPriceUSD;
+  user.balance += refundBTC;
+
+  await Transaction.create({
+    userId: user._id,
+    type: 'refund',
+    amount: refundBTC,
+    status: 'completed',
+    createdAt: new Date()
+  });
+
+  await purchase.save();
+  continue; // skip daily earnings if expired
+}
 
         purchase.earnings += earningsBTC;
         await purchase.save();
