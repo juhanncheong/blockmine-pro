@@ -51,22 +51,24 @@ router.get("/earnings/:userId", async (req, res) => {
     const totalEarnings = allEarnings.reduce((sum, tx) => sum + (tx.amount || 0), 0);
 
     const today = moment().startOf("day");
-    const todayEarnings = allEarnings
-      .filter(tx => moment(tx.date).isSame(today, "day"))
-      .reduce((sum, tx) => sum + (tx.amount || 0), 0);
 
-    // Get last 7 days chart data
-    const chartData = [];
-    for (let i = 6; i >= 0; i--) {
-      const day = moment().subtract(i, "days").startOf("day");
-      const dailyEarnings = allEarnings
-        .filter(tx => moment(tx.date).isSame(day, "day"))
-        .reduce((sum, tx) => sum + (tx.amount || 0), 0);
-      chartData.push({
-        date: day.format("MMM D"),
-        amount: parseFloat(dailyEarnings.toFixed(6)),
-      });
-    }
+const todayEarnings = allEarnings
+  .filter(tx => tx.createdAt && moment(tx.createdAt).isSame(today, "day"))
+  .reduce((sum, tx) => sum + (tx.amount || 0), 0);
+
+// 7-day chart
+const chartData = [];
+for (let i = 6; i >= 0; i--) {
+  const day = moment().subtract(i, "days").startOf("day");
+  const dailyEarnings = allEarnings
+    .filter(tx => tx.createdAt && moment(tx.createdAt).isSame(day, "day"))
+    .reduce((sum, tx) => sum + (tx.amount || 0), 0);
+
+  chartData.push({
+    date: day.format("MMM D"),
+    amount: parseFloat(dailyEarnings.toFixed(6)),
+  });
+}
 
     res.json({
       totalEarnings: parseFloat(totalEarnings.toFixed(6)),
