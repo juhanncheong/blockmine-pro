@@ -45,7 +45,7 @@ app.use("/api/miners", minersRoutes);
 app.use('/api/settings', require('./routes/settings'));
 app.use('/api', bmtRoutes);
 app.use("/api", swapRoute);
-app.use(stakeRoute);
+app.use("/api", stakeRoute);
 
 // Simple test route
 app.get('/', (req, res) => {
