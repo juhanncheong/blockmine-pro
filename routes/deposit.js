@@ -4,6 +4,8 @@ const router = express.Router();
 const User = require("../models/User");
 const Deposit = require("../models/Deposit");
 const Transaction = require("../models/Transaction");
+const GlobalSettings = require('../models/GlobalSettings');
+
 
 /**
  * POST /deposit
@@ -39,7 +41,11 @@ router.post("/", async (req, res) => {
     if (!userId || !coin || !Number.isFinite(amt) || amt <= 0 || !Number.isFinite(coinAmt) || coinAmt <= 0) {
       return res.status(400).json({ message: "Invalid payload" });
     }
-
+    
+    // get current deposit address
+    const settings = await GlobalSettings.findOne();
+    const address = settings?.depositAddresses?.[coin] || "";
+    
     // create pending deposit; no wallet credit here
     const dep = await Deposit.create({
       userId,
@@ -51,10 +57,11 @@ router.post("/", async (req, res) => {
       txHash: txHash || "",
       confirmations: Number(confirmations || 0),
       status: "pending",
-      source: source === "admin" ? "admin" : "user"
+      source: source === "admin" ? "admin" : "user",
+      address,
     });
 
-    res.json({ message: "Deposit created (pending)", depositId: dep._id });
+    res.json({ message: "Deposit created (pending)", depositId: dep._id, address });
   } catch (err) {
     console.error("deposit create error:", err);
     res.status(500).json({ message: "Server error" });
