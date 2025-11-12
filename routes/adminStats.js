@@ -4,27 +4,28 @@ const User = require("../models/User");
 const Deposit = require("../models/Deposit");
 const Withdrawal = require("../models/Withdrawal");
 
-router.get("/", async (req, res) => {
+router.get("/", async (_req, res) => {
   try {
     const totalUsers = await User.countDocuments();
 
-    const deposits = await Deposit.aggregate([
-      { $group: { _id: null, total: { $sum: "$amount" } } }
+    const depositsAgg = await Deposit.aggregate([
+      { $group: { _id: null, total: { $sum: "$amountUSD" } } }
     ]);
-    const totalDeposits = deposits[0]?.total || 0;
+    const totalDepositsUSD = depositsAgg[0]?.total || 0;
 
-    const withdrawals = await Withdrawal.aggregate([
-      { $group: { _id: null, total: { $sum: "$amount" } } }
+    const withdrawalsAgg = await Withdrawal.aggregate([
+      { $group: { _id: null, total: { $sum: "$amountUSD" } } }
     ]);
-    const totalWithdrawals = withdrawals[0]?.total || 0;
+    const totalWithdrawalsUSD = withdrawalsAgg[0]?.total || 0;
 
-    const totalEarnings = 0; // you can calculate later if needed
+    // Optional: compute total earningsUSD from users (or sum transactions of type 'earnings')
+    const totalEarningsUSD = 0;
 
     res.json({
       totalUsers,
-      totalDeposits,
-      totalWithdrawals,
-      totalEarnings
+      totalDepositsUSD: +Number(totalDepositsUSD).toFixed(2),
+      totalWithdrawalsUSD: +Number(totalWithdrawalsUSD).toFixed(2),
+      totalEarningsUSD
     });
   } catch (err) {
     console.error("Error generating stats:", err);

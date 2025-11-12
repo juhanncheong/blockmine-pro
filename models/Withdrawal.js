@@ -1,12 +1,19 @@
 const mongoose = require('mongoose');
 
-const withdrawalSchema = new mongoose.Schema({
-  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-  amount: { type: Number, required: true },  // BTC amount
-  address: { type: String, required: true }, // Wallet address user wants to withdraw to
-  status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },
-  requestedAt: { type: Date, default: Date.now },
-  processedAt: { type: Date }
+const WithdrawalSchema = new mongoose.Schema({
+  userId:     { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+
+  // USD only
+  amountUSD:  { type: Number, required: true },        // requested USD amount
+
+  // Payout details (bank, usdt-offchain, paypal, etc.)
+  method:     { type: String, default: 'manual' },     // e.g. 'bank', 'paypal', 'usdt-offchain'
+  details:    { type: String, default: '' },           // account/wallet/notes
+
+  status:     { type: String, enum: ['pending','approved','rejected','paid'], default: 'pending' },
+
+  requestedAt:{ type: Date, default: Date.now },
+  processedAt:{ type: Date }
 });
 
-module.exports = mongoose.model('Withdrawal', withdrawalSchema);
+module.exports = mongoose.model('Withdrawal', WithdrawalSchema);

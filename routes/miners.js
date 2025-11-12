@@ -1,55 +1,60 @@
 const express = require("express");
 const router = express.Router();
 const MiningPurchase = require("../models/MiningPurchase");
-const Package = require("../models/Package");
 
 router.get("/summary/:userId", async (req, res) => {
   try {
     const userId = req.params.userId;
 
-    // Fetch all active purchases + linked package info
-    const purchases = await MiningPurchase.find({ userId }).populate("packageId");
+    // Fetch all purchases (active + expired) with package data
+    const purchases = await MiningPurchase
+      .find({ userId })
+      .populate("packageId");
 
-    // Initialize calculations
     let activeMiners = 0;
     let totalHashrate = 0;
-    let totalEarned = 0;
+    let totalEarnedUSD = 0;
     const miners = [];
 
     const today = new Date();
 
-    purchases.forEach(purchase => {
-      const packageData = purchase.packageId;
+    for (const purchase of purchases) {
+      const pkg = purchase.packageId;
+      if (!pkg) continue; // guard against deleted/missing packages
+
       const purchaseDate = new Date(purchase.purchaseDate);
       const daysSincePurchase = Math.floor((today - purchaseDate) / (1000 * 60 * 60 * 24));
-      const remainingDays = packageData.duration - daysSincePurchase;
+      const remainingDays = Math.max(0, Number(pkg.duration || 0) - daysSincePurchase);
 
-      // Check if miner is still active
-      if (remainingDays > 0) {
+      // Active if flagged active AND not past duration
+      const isActive = Boolean(purchase.isActive) && remainingDays > 0;
+      if (isActive) {
         activeMiners += 1;
-        totalHashrate += packageData.miningPower;
+        totalHashrate += Number(pkg.miningPower || 0);
       }
 
-      totalEarned += purchase.earnings;
+      const earnedUSD = Number(purchase.earningsUSD || 0);
+      totalEarnedUSD += earnedUSD;
 
       miners.push({
-        packageName: packageData.name,
-        miningPower: packageData.miningPower,
+        packageName: pkg.name || "Package",
+        miningPower: Number(pkg.miningPower || 0),
         purchaseDate: purchaseDate.toISOString().split("T")[0],
-        remainingDays: remainingDays > 0 ? remainingDays : 0,
-        earned: purchase.earnings
+        remainingDays,
+        earnedUSD: Number(earnedUSD.toFixed(2)),
+        isActive
       });
-    });
+    }
 
     res.json({
       activeMiners,
       totalHashrate,
-      totalEarned,
+      totalEarnedUSD: Number(totalEarnedUSD.toFixed(2)),
       miners
     });
 
   } catch (err) {
-    console.error(err);
+    console.error("❌ miners summary error:", err);
     res.status(500).json({ error: "Failed to load miners summary" });
   }
 });

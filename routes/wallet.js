@@ -3,22 +3,25 @@ const router = express.Router();
 const User = require("../models/User");
 const Withdrawal = require("../models/Withdrawal");
 const MiningPurchase = require('../models/MiningPurchase');
-const Package = require('../models/Package');
 
-// GET wallet balance
+// GET wallet balance (USD) + mining power
 router.get("/balance/:userId", async (req, res) => {
   try {
     const user = await User.findById(req.params.userId);
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
+    if (!user) return res.status(404).json({ message: "User not found" });
 
-    // ✅ Dynamically calculate miningPower from active packages
-    const purchases = await MiningPurchase.find({ userId: user._id, isActive: true }).populate('packageId');
-    const totalMiningPower = purchases.reduce((sum, purchase) => sum + (purchase.packageId?.miningPower || 0), 0);
+    // Sum active mining power from purchases
+    const purchases = await MiningPurchase
+      .find({ userId: user._id, isActive: true })
+      .populate('packageId');
 
-    res.json({ 
-      btcBalance: user.balance || 0,
+    const totalMiningPower = purchases.reduce(
+      (sum, p) => sum + (p.packageId?.miningPower || 0),
+      0
+    );
+
+    res.json({
+      usdBalance: Number(user.balanceUSD || 0), // ← USD-only
       miningPower: totalMiningPower
     });
 
@@ -28,7 +31,7 @@ router.get("/balance/:userId", async (req, res) => {
   }
 });
 
-// ✅ NEW pending withdrawals route:
+// Pending withdrawals count (unchanged)
 router.get("/pending/:userId", async (req, res) => {
   try {
     const pendingCount = await Withdrawal.countDocuments({

@@ -60,68 +60,72 @@ router.put('/edit/:id', async (req, res) => {
   }
 });
 
-// ✅ PURCHASE using client-provided requiredBTC (no live price calls)
 router.post('/purchase', async (req, res) => {
   try {
-    const { userId, packageId, requiredBTC } = req.body;
+    const { userId, packageId } = req.body;
 
     // Validate payload
-    if (!userId || !packageId || !(Number(requiredBTC) > 0)) {
+    if (!userId || !packageId) {
       return res.status(400).json({ message: 'Invalid payload' });
     }
 
     const user = await User.findById(userId);
     if (!user) return res.status(404).json({ message: 'User not found' });
 
-    const packageData = await Package.findById(packageId);
-    if (!packageData) return res.status(404).json({ message: 'Package not found' });
+    const pkg = await Package.findById(packageId);
+    if (!pkg) return res.status(404).json({ message: 'Package not found' });
 
-    const need = Number(Number(requiredBTC).toFixed(8));
-    if (!Number.isFinite(need) || need <= 0) {
-      return res.status(400).json({ message: 'requiredBTC must be a positive number' });
-    }
-    if (user.balance < need) {
-      return res.status(400).json({ message: 'Insufficient BTC balance' });
+    const priceUSD = Number(pkg.priceUSD || 0);
+    if (!Number.isFinite(priceUSD) || priceUSD <= 0) {
+      return res.status(400).json({ message: 'Package priceUSD is invalid' });
     }
 
-    // Deduct BTC
-    user.balance = Number((user.balance - need).toFixed(8));
+    // Check USD balance
+    if ((user.balanceUSD || 0) < priceUSD) {
+      return res.status(400).json({ message: 'Insufficient USD balance' });
+    }
 
-    // Optional referral commission (guard self-referral)
+    // Debit user USD balance
+    user.balanceUSD = Number(((user.balanceUSD || 0) - priceUSD).toFixed(2));
+
+    // Optional referral commission (guard self-referral) — 15% of priceUSD
     if (user.referralCode && user.referralCode !== user.ownReferralCode) {
       const inviter = await User.findOne({ ownReferralCode: user.referralCode });
       if (inviter) {
-        const commission = Number((need * 0.15).toFixed(8));
-        inviter.balance = Number(((inviter.balance || 0) + commission).toFixed(8));
+        const commissionUSD = Number((priceUSD * 0.15).toFixed(2));
+        inviter.balanceUSD = Number(((inviter.balanceUSD || 0) + commissionUSD).toFixed(2));
         await inviter.save();
+
         await Transaction.create({
           userId: inviter._id,
           type: 'referral-commission',
-          amount: commission,
-          createdAt: new Date()
+          amountUSD: commissionUSD,
+          note: `Commission from ${user.username} (${pkg.name})`
         });
       }
     }
 
-    // Record the spend
+    // Record the purchase spend (negative)
     await Transaction.create({
       userId: user._id,
       type: 'purchase',
-      amount: need,
-      createdAt: new Date()
+      amountUSD: -priceUSD,
+      note: pkg.name
     });
 
-    // Create the mining purchase
+    // Create the mining purchase (USD-only, refundable principal at expiry)
     await MiningPurchase.create({
       userId: user._id,
-      packageId: packageData._id,
+      packageId: pkg._id,
       purchaseDate: new Date(),
-      earnings: 0,
-      isActive: true
+      isActive: true,
+      earningsUSD: 0,
+      principalUSD: priceUSD,
+      principalRefunded: false
     });
 
     // BMT reward (if any)
-    const tokensToAdd = Number(packageData.bmtReward || 0);
+    const tokensToAdd = Number(pkg.bmtReward || 0);
     if (tokensToAdd > 0) {
       user.bmtBalance = Number(((user.bmtBalance || 0) + tokensToAdd).toFixed(8));
     }
@@ -129,7 +133,7 @@ router.post('/purchase', async (req, res) => {
     // Persist user changes
     await user.save();
 
-    // Return updated mining power
+    // Return updated total mining power from active purchases
     const purchases = await MiningPurchase
       .find({ userId: user._id, isActive: true })
       .populate('packageId');
@@ -140,13 +144,13 @@ router.post('/purchase', async (req, res) => {
     );
 
     res.json({
-      message: 'Package purchased successfully',
+      message: 'Package purchased successfully (USD)',
       miningPower: totalMiningPower,
-      balance: user.balance
+      balanceUSD: user.balanceUSD
     });
 
   } catch (err) {
-    console.error('🔥 Purchase error:', err);
+    console.error('🔥 USD Purchase error:', err);
     res.status(500).json({ message: 'Server error' });
   }
 });

@@ -1,39 +1,36 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
+const router = express.Router();
+
 const Admin = require('../models/Admin');
 const User = require('../models/User');
 const Withdrawal = require('../models/Withdrawal');
-const router = express.Router();
 const MiningPurchase = require('../models/MiningPurchase');
 const Package = require('../models/Package');
-const Deposit = require("../models/Deposit");
+const Deposit = require('../models/Deposit');
+const Stake = require('../models/Stake');
+const Transaction = require('../models/Transaction'); // ← for USD ledger writes
 
-// Admin login route
+// ---------- Auth ----------
+
 router.post('/login', async (req, res) => {
   const { email, password } = req.body;
   try {
     const admin = await Admin.findOne({ email });
     if (!admin) return res.status(400).json({ message: 'Invalid credentials' });
-
-    // For now plain text, so direct compare
     if (password !== admin.password) {
       return res.status(400).json({ message: 'Invalid credentials' });
     }
-
-    // Generate JWT token
     const token = jwt.sign({ adminId: admin._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
-
     res.json({ token, email: admin.email });
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
   }
 });
 
-// Middleware to protect admin routes
 function verifyAdminToken(req, res, next) {
   const token = req.headers.authorization?.split(' ')[1];
   if (!token) return res.status(401).json({ message: 'No token provided' });
-
   jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
     if (err) return res.status(401).json({ message: 'Invalid token' });
     req.adminId = decoded.adminId;
@@ -41,19 +38,33 @@ function verifyAdminToken(req, res, next) {
   });
 }
 
-// Admin Stats Endpoint
-router.get('/stats', verifyAdminToken, async (req, res) => {
+// ---------- Stats ----------
+
+router.get('/stats', verifyAdminToken, async (_req, res) => {
   try {
     const totalUsers = await User.countDocuments();
-    const totalMiningPower = await User.aggregate([
-      { $group: { _id: null, totalPower: { $sum: "$miningPower" } } }
-    ]);
     const totalWithdrawals = await Withdrawal.countDocuments({ status: 'approved' });
     const pendingWithdrawals = await Withdrawal.countDocuments({ status: 'pending' });
 
+    // Compute mining power from active purchases (lookup into Package)
+    const agg = await MiningPurchase.aggregate([
+      { $match: { isActive: true } },
+      {
+        $lookup: {
+          from: 'packages',
+          localField: 'packageId',
+          foreignField: '_id',
+          as: 'pkg'
+        }
+      },
+      { $unwind: '$pkg' },
+      { $group: { _id: null, totalPower: { $sum: '$pkg.miningPower' } } }
+    ]);
+    const totalMiningPower = agg[0]?.totalPower || 0;
+
     res.json({
       totalUsers,
-      totalMiningPower: totalMiningPower[0]?.totalPower || 0,
+      totalMiningPower,
       totalWithdrawals,
       pendingWithdrawals,
     });
@@ -62,33 +73,34 @@ router.get('/stats', verifyAdminToken, async (req, res) => {
   }
 });
 
-// User Management (search + paginate + sort)
+// ---------- Users (search/list/update) ----------
+
 router.get('/users', verifyAdminToken, async (req, res) => {
   const { email, page = 1 } = req.query;
   const limit = 10;
   const skip = (page - 1) * limit;
 
   try {
-    let query = {};
-    if (email) query.email = { $regex: email, $options: 'i' };
-
+    const query = email ? { email: { $regex: email, $options: 'i' } } : {};
     const total = await User.countDocuments(query);
     const users = await User.find(query)
-  .sort({ createdAt: -1, _id: -1 }) // newest → oldest
-  .skip(skip)
-  .limit(limit)
-  .lean();
+      .sort({ createdAt: -1, _id: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean();
 
-    // Now calculate miningPower for each user dynamically:
-    const usersWithMiningPower = await Promise.all(users.map(async (user) => {
-      const purchases = await MiningPurchase.find({ userId: user._id, isActive: true }).populate('packageId');
-      const totalMiningPower = purchases.reduce((sum, purchase) => sum + (purchase.packageId?.miningPower || 0), 0);
-
-      return {
-        ...user,
-        miningPower: totalMiningPower
-      };
-    }));
+    const usersWithMiningPower = await Promise.all(
+      users.map(async (user) => {
+        const purchases = await MiningPurchase
+          .find({ userId: user._id, isActive: true })
+          .populate('packageId');
+        const totalMiningPower = purchases.reduce(
+          (sum, p) => sum + (p.packageId?.miningPower || 0),
+          0
+        );
+        return { ...user, miningPower: totalMiningPower };
+      })
+    );
 
     res.json({ total, users: usersWithMiningPower });
   } catch (err) {
@@ -97,21 +109,19 @@ router.get('/users', verifyAdminToken, async (req, res) => {
   }
 });
 
-// Update user fields (password, email, withdrawalPin, balance, freeze)
 router.put('/users/:id', verifyAdminToken, async (req, res) => {
   const { id } = req.params;
-  const { password, email, withdrawalPin, balance, freezeAccount } = req.body;
+  const { password, email, withdrawalPin, balanceUSD, freezeAccount } = req.body;
 
   try {
     const update = {};
-    if (password) update.password = password; // hash if you want later
+    if (password) update.password = password; // (consider hashing later)
     if (email) update.email = email;
     if (withdrawalPin) update.withdrawalPin = withdrawalPin;
-    if (balance !== undefined) update.balance = balance;
+    if (balanceUSD !== undefined) update.balanceUSD = balanceUSD; // USD era
     if (freezeAccount !== undefined) update.isFrozen = freezeAccount;
 
     const user = await User.findByIdAndUpdate(id, update, { new: true });
-
     if (!user) return res.status(404).json({ message: 'User not found' });
 
     res.json({ message: 'User updated', user });
@@ -120,8 +130,9 @@ router.put('/users/:id', verifyAdminToken, async (req, res) => {
   }
 });
 
-// List Withdrawals (for admin)
-router.get('/withdrawals', verifyAdminToken, async (req, res) => {
+// ---------- Withdrawals (list/process) ----------
+
+router.get('/withdrawals', verifyAdminToken, async (_req, res) => {
   try {
     const withdrawals = await Withdrawal.find()
       .populate('userId', 'email username')
@@ -133,7 +144,6 @@ router.get('/withdrawals', verifyAdminToken, async (req, res) => {
   }
 });
 
-// Approve or Reject Withdrawal
 router.post('/withdrawals/process', verifyAdminToken, async (req, res) => {
   const { withdrawalId, action } = req.body;
   try {
@@ -144,27 +154,41 @@ router.post('/withdrawals/process', verifyAdminToken, async (req, res) => {
     if (action === 'approve') {
       withdrawal.status = 'approved';
       withdrawal.processedAt = new Date();
-    } else if (action === 'reject') {
+      await withdrawal.save();
+      return res.json({ message: 'Withdrawal approved' });
+    }
+
+    if (action === 'reject') {
       withdrawal.status = 'rejected';
       withdrawal.processedAt = new Date();
 
-      // Refund user
       const user = await User.findById(withdrawal.userId);
-      user.balance += withdrawal.amount;
-      await user.save();
-    } else {
-      return res.status(400).json({ message: 'Invalid action' });
+      if (user) {
+        user.balanceUSD = (user.balanceUSD || 0) + (withdrawal.amountUSD || 0);
+        await user.save();
+
+        // Ledger reversal for transparency
+        await Transaction.create({
+          userId: user._id,
+          type: 'withdrawal',
+          amountUSD: +(withdrawal.amountUSD || 0),
+          note: 'Withdrawal rejected refund (admin)'
+        });
+      }
+
+      await withdrawal.save();
+      return res.json({ message: 'Withdrawal rejected and refunded' });
     }
 
-    await withdrawal.save();
-    res.json({ message: `Withdrawal ${action}d successfully` });
+    return res.status(400).json({ message: 'Invalid action' });
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
   }
 });
 
-// Package Management endpoints
-router.get('/packages', verifyAdminToken, async (req, res) => {
+// ---------- Packages CRUD ----------
+
+router.get('/packages', verifyAdminToken, async (_req, res) => {
   try {
     const packages = await Package.find().lean();
     res.json(packages);
@@ -188,7 +212,11 @@ router.put('/packages/:id', verifyAdminToken, async (req, res) => {
   const { id } = req.params;
   const { name, priceUSD, miningPower, duration } = req.body;
   try {
-    const updatedPackage = await Package.findByIdAndUpdate(id, { name, priceUSD, miningPower, duration }, { new: true });
+    const updatedPackage = await Package.findByIdAndUpdate(
+      id,
+      { name, priceUSD, miningPower, duration },
+      { new: true }
+    );
     if (!updatedPackage) return res.status(404).json({ message: 'Package not found' });
     res.json({ message: 'Package updated', updatedPackage });
   } catch (err) {
@@ -206,36 +234,54 @@ router.delete('/packages/:id', verifyAdminToken, async (req, res) => {
   }
 });
 
+// ---------- Admin deposit (manual credit in USD + ledger) ----------
 
-
-router.post("/admin/deposit", async (req, res) => {
+router.post('/admin/deposit', verifyAdminToken, async (req, res) => {
   try {
-    const { userId, amount } = req.body;
+    const { userId, amountUSD } = req.body;
 
     const user = await User.findById(userId);
-    if (!user) return res.status(404).json({ message: "User not found" });
+    if (!user) return res.status(404).json({ message: 'User not found' });
 
-    // Create deposit record
+    // Record an approved deposit row for audit
     const newDeposit = new Deposit({
       userId: user._id,
-      amount: parseFloat(amount),
+      amountUSD: parseFloat(amountUSD),
+      coin: 'admin',
+      network: 'manual',
+      expectedCoinAmount: 0,
+      quoteRate: 1,
+      status: 'approved',
+      source: 'admin'
     });
     await newDeposit.save();
 
-    // Update user balance
-    user.balance += parseFloat(amount);
+    // Credit user
+    user.balanceUSD = (user.balanceUSD || 0) + parseFloat(amountUSD);
     await user.save();
 
-    res.json({ message: "Deposit added successfully" });
+    // Ledger
+    await Transaction.create({
+      userId: user._id,
+      type: 'deposit',
+      amountUSD: parseFloat(amountUSD),
+      note: 'Admin deposit'
+    });
+
+    res.json({ message: 'Deposit added successfully', balanceUSD: user.balanceUSD });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
+// ---------- Admin attach/detach user packages ----------
+
 router.get('/user-packages/:userId', verifyAdminToken, async (req, res) => {
   try {
-    const purchases = await MiningPurchase.find({ userId: req.params.userId }).populate('packageId');
+    const purchases = await MiningPurchase
+      .find({ userId: req.params.userId })
+      .populate('packageId');
     res.json(purchases);
   } catch (err) {
     console.error(err);
@@ -245,23 +291,22 @@ router.get('/user-packages/:userId', verifyAdminToken, async (req, res) => {
 
 router.post('/user-packages', verifyAdminToken, async (req, res) => {
   const { userId, packageId } = req.body;
-
   if (!userId || !packageId) {
     return res.status(400).json({ message: 'Missing userId or packageId' });
   }
 
   try {
     const pkg = await Package.findById(packageId);
-    if (!pkg) {
-      return res.status(404).json({ message: 'Package not found' });
-    }
+    if (!pkg) return res.status(404).json({ message: 'Package not found' });
 
     await MiningPurchase.create({
       userId,
       packageId: pkg._id,
       purchaseDate: new Date(),
-      earnings: 0,
-      isActive: true
+      isActive: true,
+      earningsUSD: 0,
+      principalUSD: 0,          // admin-granted package, no charge taken
+      principalRefunded: false
     });
 
     res.json({ message: 'Package added to user successfully' });
@@ -274,11 +319,7 @@ router.post('/user-packages', verifyAdminToken, async (req, res) => {
 router.delete('/user-packages/:purchaseId', verifyAdminToken, async (req, res) => {
   try {
     const deleted = await MiningPurchase.findByIdAndDelete(req.params.purchaseId);
-
-    if (!deleted) {
-      return res.status(404).json({ message: 'Purchase not found' });
-    }
-
+    if (!deleted) return res.status(404).json({ message: 'Purchase not found' });
     res.json({ message: 'Package purchase deleted successfully' });
   } catch (err) {
     console.error(err);
@@ -286,7 +327,8 @@ router.delete('/user-packages/:purchaseId', verifyAdminToken, async (req, res) =
   }
 });
 
-// Admin: Get user BMT balance by email
+// ---------- BMT helpers ----------
+
 router.get('/user-bmt', verifyAdminToken, async (req, res) => {
   const { email } = req.query;
   if (!email) return res.status(400).json({ message: 'Email is required' });
@@ -306,10 +348,8 @@ router.get('/user-bmt', verifyAdminToken, async (req, res) => {
   }
 });
 
-// Admin: Adjust BMT balance (add or subtract)
 router.post('/adjust-bmt', verifyAdminToken, async (req, res) => {
   const { userId, amount } = req.body;
-
   if (!userId || typeof amount !== 'number') {
     return res.status(400).json({ message: 'Missing userId or invalid amount' });
   }
@@ -328,48 +368,46 @@ router.post('/adjust-bmt', verifyAdminToken, async (req, res) => {
   }
 });
 
-const Stake = require("../models/Stake");
+// ---------- Stakes ----------
 
-// Admin: View all stakes (optionally filter by user email)
-router.get("/stakes", verifyAdminToken, async (req, res) => {
+router.get('/stakes', verifyAdminToken, async (req, res) => {
   const { email } = req.query;
 
   try {
-    let userFilter = {};
+    const userFilter = {};
     if (email) {
       const user = await User.findOne({ email });
-      if (!user) return res.status(404).json({ message: "User not found" });
+      if (!user) return res.status(404).json({ message: 'User not found' });
       userFilter.userId = user._id;
     }
 
     const stakes = await Stake.find(userFilter)
       .sort({ startDate: -1 })
-      .populate("userId", "email");
+      .populate('userId', 'email');
 
     res.json(stakes);
   } catch (err) {
-    console.error("Failed to fetch stakes", err);
-    res.status(500).json({ message: "Server error" });
+    console.error('Failed to fetch stakes', err);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
-router.get('/bmt-stats', verifyAdminToken, async (req, res) => {
+router.get('/bmt-stats', verifyAdminToken, async (_req, res) => {
   try {
-    const users = await User.find({}, "bmtBalance email");
+    const users = await User.find({}, 'bmtBalance email');
     const totalBMT = users.reduce((sum, u) => sum + (u.bmtBalance || 0), 0);
-
     const topHolder = users.sort((a, b) => (b.bmtBalance || 0) - (a.bmtBalance || 0))[0];
 
     res.json({
       totalBMT,
       topHolder: {
-        email: topHolder?.email || "N/A",
+        email: topHolder?.email || 'N/A',
         bmtBalance: topHolder?.bmtBalance || 0,
       },
     });
   } catch (err) {
-    console.error("Failed to fetch BMT stats", err);
-    res.status(500).json({ message: "Server error" });
+    console.error('Failed to fetch BMT stats', err);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 

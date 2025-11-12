@@ -2,6 +2,8 @@ const mongoose = require("mongoose");
 
 const TransactionSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+
+  // Transaction purpose
   type: {
     type: String,
     enum: [
@@ -9,16 +11,18 @@ const TransactionSchema = new mongoose.Schema({
       "withdraw",
       "purchase",
       "referral-commission",
-      "mining",
       "earnings",
-      "swap" // ✅ new type
+      "principal-refund"
     ],
     required: true,
   },
-  amount: { type: Number }, // use this for BTC, or leave null for swaps
-  bmtAmount: { type: Number }, // ✅ for swap type
-  btcAmount: { type: Number }, // ✅ for swap type
-  usdValue: { type: Number },  // ✅ value of swap in USD
+
+  // Amount in USD (positive = credit, negative = debit)
+  amountUSD: { type: Number, required: true },
+
+  // Optional note, e.g. "Package A purchase", "Referral from John"
+  note: { type: String, default: "" },
+
   createdAt: { type: Date, default: Date.now },
 });
 

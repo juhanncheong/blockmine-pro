@@ -1,37 +1,35 @@
 const express = require("express");
 const router = express.Router();
-const User = require("../models/User");
-const Withdrawal = require("../models/Withdrawal");
-const MiningPurchase = require("../models/MiningPurchase");
-const Package = require("../models/Package");
-const Transaction = require("../models/Transaction");
+const User = require("./models/User");
+const Withdrawal = require("./models/Withdrawal");
+const MiningPurchase = require("./models/MiningPurchase");
+const Package = require("./models/Package");
+const Transaction = require("./models/Transaction");
 const moment = require("moment");
 
+// GET /api/dashboard/summary/:userId
 router.get("/summary/:userId", async (req, res) => {
   try {
     const userId = req.params.userId;
 
-    // Load user, withdrawals, and active mining purchases
     const [user, pendingWithdrawals, purchases] = await Promise.all([
       User.findById(userId),
       Withdrawal.countDocuments({ userId, status: "pending" }),
-      MiningPurchase.find({ userId, isActive: true }).populate("packageId")
+      MiningPurchase.find({ userId, isActive: true }).populate("packageId"),
     ]);
 
-    // Calculate total mining power by summing miningPower from linked Package
     const miningPowerTotal = purchases.reduce((total, purchase) => {
       const packagePower = purchase.packageId?.miningPower || 0;
       return total + packagePower;
     }, 0);
 
     res.json({
-      btcBalance: user.balance || 0,
+      usdBalance: user?.balanceUSD || 0,
       miningPower: miningPowerTotal,
       pendingWithdrawals: pendingWithdrawals || 0,
-      bmtBalance: user.bmtBalance || 0, // ✅ Add this line
+      bmtBalance: user?.bmtBalance || 0,
       activePackages: purchases.length || 0,
     });
-
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to load dashboard summary" });
@@ -48,31 +46,39 @@ router.get("/earnings/:userId", async (req, res) => {
       type: "earnings",
     });
 
-    const totalEarnings = allEarnings.reduce((sum, tx) => sum + (tx.amount || 0), 0);
+    // Sum in USD
+    const totalEarnings = allEarnings.reduce(
+      (sum, tx) => sum + (tx.amountUSD || 0),
+      0
+    );
 
     const today = moment().startOf("day");
 
-const todayEarnings = allEarnings
-  .filter(tx => tx.createdAt && moment(tx.createdAt).isSame(today, "day"))
-  .reduce((sum, tx) => sum + (tx.amount || 0), 0);
+    const todayEarnings = allEarnings
+      .filter(
+        (tx) => tx.createdAt && moment(tx.createdAt).isSame(today, "day")
+      )
+      .reduce((sum, tx) => sum + (tx.amountUSD || 0), 0);
 
-// 7-day chart
-const chartData = [];
-for (let i = 6; i >= 0; i--) {
-  const day = moment().subtract(i, "days").startOf("day");
-  const dailyEarnings = allEarnings
-    .filter(tx => tx.createdAt && moment(tx.createdAt).isSame(day, "day"))
-    .reduce((sum, tx) => sum + (tx.amount || 0), 0);
+    // 7-day chart
+    const chartData = [];
+    for (let i = 6; i >= 0; i--) {
+      const day = moment().subtract(i, "days").startOf("day");
+      const dailyEarnings = allEarnings
+        .filter(
+          (tx) => tx.createdAt && moment(tx.createdAt).isSame(day, "day")
+        )
+        .reduce((sum, tx) => sum + (tx.amountUSD || 0), 0);
 
-  chartData.push({
-    date: day.format("MMM D"),
-    amount: parseFloat(dailyEarnings.toFixed(6)),
-  });
-}
+      chartData.push({
+        date: day.format("MMM D"),
+        amount: Number(dailyEarnings.toFixed(2)),
+      });
+    }
 
     res.json({
-      totalEarnings: parseFloat(totalEarnings.toFixed(6)),
-      todayEarnings: parseFloat(todayEarnings.toFixed(6)),
+      totalEarnings: Number(totalEarnings.toFixed(2)),
+      todayEarnings: Number(todayEarnings.toFixed(2)),
       chartData,
     });
   } catch (err) {
@@ -80,4 +86,5 @@ for (let i = 6; i >= 0; i--) {
     res.status(500).json({ message: "Server error" });
   }
 });
+
 module.exports = router;
