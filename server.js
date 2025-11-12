@@ -67,8 +67,6 @@ mongoose.connect(process.env.MONGO_URI, {
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 
-const { runDailyEarnings } = require('./utils/miningJobs');
-
 // 🔹 On any request, occasionally check if we owe earnings
 let lastEnsureCheck = 0;
 let ensureInFlight = false;
