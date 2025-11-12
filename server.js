@@ -20,6 +20,7 @@ const bmtRoutes = require('./routes/bmt');
 const swapRoute = require("./routes/swap");
 const stakeRoute = require("./routes/stake");
 const priceRoutes = require("./routes/price");
+const { runDailyEarnings, ensureDailyEarningsUpToDate } = require('./utils/miningJobs');
 
 // Middleware
 app.use(express.json());
@@ -68,7 +69,29 @@ app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 
 const { runDailyEarnings } = require('./utils/miningJobs');
 
+// 🔹 On any request, occasionally check if we owe earnings
+let lastEnsureCheck = 0;
+let ensureInFlight = false;
+
+app.use(async (req, res, next) => {
+  const now = Date.now();
+  // Max once every 5 minutes to avoid hammering DB on high traffic
+  if (!ensureInFlight && now - lastEnsureCheck > 5 * 60 * 1000) {
+    ensureInFlight = true;
+    lastEnsureCheck = now;
+    ensureDailyEarningsUpToDate()
+      .catch(err => console.error('ensureDailyEarningsUpToDate error:', err))
+      .finally(() => { ensureInFlight = false; });
+  }
+  next();
+});
+
+// Existing cron — now in America/New_York because TZ is set
 cron.schedule('0 0 * * *', async () => {
-  console.log("⏱ Running daily mining earnings...");
-  await runDailyEarnings();
+  console.log("⏱ Running daily mining earnings from cron...");
+  try {
+    await runDailyEarnings();
+  } catch (err) {
+    console.error('Cron runDailyEarnings error:', err);
+  }
 });
