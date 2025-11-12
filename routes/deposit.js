@@ -1,9 +1,9 @@
 const express = require("express");
 const router = express.Router();
 
-const User = require("./models/User");
-const Deposit = require("./models/Deposit");
-const Transaction = require("./models/Transaction");
+const User = require("../models/User");
+const Deposit = require("../models/Deposit");
+const Transaction = require("../models/Transaction");
 
 /**
  * POST /deposit
