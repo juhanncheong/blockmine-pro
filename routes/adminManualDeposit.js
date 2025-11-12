@@ -22,15 +22,15 @@ router.post("/", async (req, res) => {
     const btcPrice = await fetchBTCPrice();
 
     const deposit = new Deposit({
-  userId,
-  coin: "BTC",
-  amountUSD: parseFloat((amountBTC * btcPrice).toFixed(2)),
-  sendCoinAmount: amountBTC,
-  creditBTC: amountBTC,
-  status: "approved",
-  source: "admin", // ✅ ADDED HERE
-  createdAt: new Date()
-});
+      userId,
+      coin: "BTC",
+      amountUSD: parseFloat((amountBTC * btcPrice).toFixed(2)),
+      sendCoinAmount: amountBTC,
+      creditBTC: amountBTC,
+      status: "approved",
+      source: "admin", // ✅ ADDED HERE
+      createdAt: new Date()
+    });
 
     await deposit.save();
 
