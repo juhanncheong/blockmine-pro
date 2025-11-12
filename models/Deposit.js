@@ -15,12 +15,15 @@ const depositSchema = new mongoose.Schema({
   quoteRate:           { type: Number, default: 0 },             // USD per coin at quote time (from your FE)
   quotedAt:            { type: Date, default: Date.now },
 
+  // ✅ NEW: which address the user should send to (from GlobalSettings)
+  address:             { type: String, default: "" },
+
   // Proof (user/admin fills these later)
   txHash:              { type: String, default: "" },            // on-chain hash / transfer id
   confirmations:       { type: Number, default: 0 },             // for chains where you track it
 
   // Workflow
-  status:              { type: String, enum: ["pending","approved","rejected"], default: "pending" },
+  status:              { type: String, enum: ["pending","approved","rejected","canceled"], default: "pending" },
   source:              { type: String, enum: ["user","admin"], default: "user" },
   createdAt:           { type: Date, default: Date.now }
 });

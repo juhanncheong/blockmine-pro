@@ -6,21 +6,7 @@ const Deposit = require("../models/Deposit");
 const Transaction = require("../models/Transaction");
 const GlobalSettings = require('../models/GlobalSettings');
 
-
-/**
- * POST /deposit
- * Create a deposit request.
- * Body:
- *  - userId: string (required)
- *  - amountUSD: number (required)         // how much USD to credit on approval
- *  - coin: string (required)              // 'BTC', 'ETH', 'USDT-TRC20', etc.
- *  - network?: string                     // 'BTC', 'ERC20', 'TRC20', etc.
- *  - expectedCoinAmount: number (required)// from FE quote at request time
- *  - quoteRate?: number                   // USD per coin at quote time (for audit)
- *  - txHash?: string                      // optional; can be added later
- *  - confirmations?: number               // optional; can be updated later
- *  - source?: 'user' | 'admin'            // default 'user'
- */
+// POST /api/deposit  -> create pending deposit (user flow)
 router.post("/", async (req, res) => {
   try {
     const {
@@ -28,27 +14,33 @@ router.post("/", async (req, res) => {
       amountUSD,
       coin,
       network,
-      expectedCoinAmount,
+      expectedCoinAmount,   // optional (FE name in some pages)
+      sendCoinAmount,       // optional (FE name in other pages)
       quoteRate,
       txHash,
       confirmations,
       source
-    } = req.body;
+    } = req.body || {};
 
     const amt = Number(amountUSD);
-    const coinAmt = Number(expectedCoinAmount);
+    const coinAmt = Number(
+      expectedCoinAmount ?? sendCoinAmount // ✅ accept either name
+    );
 
     if (!userId || !coin || !Number.isFinite(amt) || amt <= 0 || !Number.isFinite(coinAmt) || coinAmt <= 0) {
       return res.status(400).json({ message: "Invalid payload" });
     }
-    
-    // get current deposit address
+
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    // Get admin-configured address for this coin
     const settings = await GlobalSettings.findOne();
     const address = settings?.depositAddresses?.[coin] || "";
-    
-    // create pending deposit; no wallet credit here
+
+    // Create pending deposit (no wallet credit here)
     const dep = await Deposit.create({
-      userId,
+      userId: user._id,
       amountUSD: +amt,
       coin,
       network: network || "",
@@ -58,21 +50,17 @@ router.post("/", async (req, res) => {
       confirmations: Number(confirmations || 0),
       status: "pending",
       source: source === "admin" ? "admin" : "user",
-      address,
+      address,                              // ✅ persist it
     });
 
-    res.json({ message: "Deposit created (pending)", depositId: dep._id, address });
+    return res.json({ message: "Deposit created (pending)", depositId: dep._id, address });
   } catch (err) {
     console.error("deposit create error:", err);
-    res.status(500).json({ message: "Server error" });
+    return res.status(500).json({ message: "Server error" });
   }
 });
 
-/**
- * PATCH /deposit/:id/proof
- * Update proof fields (txHash / confirmations) after user pays.
- * Body: { txHash?, confirmations? }
- */
+// PATCH /api/deposit/:id/proof -> update tx hash / confirmations
 router.patch("/:id/proof", async (req, res) => {
   try {
     const dep = await Deposit.findById(req.params.id);
@@ -80,11 +68,8 @@ router.patch("/:id/proof", async (req, res) => {
     if (dep.status !== "pending") {
       return res.status(400).json({ message: "Deposit already processed" });
     }
-
     if (typeof req.body.txHash === "string") dep.txHash = req.body.txHash;
-    if (Number.isFinite(Number(req.body.confirmations))) {
-      dep.confirmations = Number(req.body.confirmations);
-    }
+    if (Number.isFinite(Number(req.body.confirmations))) dep.confirmations = Number(req.body.confirmations);
     await dep.save();
     res.json({ message: "Proof updated", depositId: dep._id });
   } catch (err) {
@@ -93,27 +78,19 @@ router.patch("/:id/proof", async (req, res) => {
   }
 });
 
-/**
- * POST /deposit/:id/approve
- * Admin approves after verifying on-chain payment.
- * Credits user.balanceUSD and logs a Transaction.
- */
+// POST /api/deposit/:id/approve -> admin approves & credits USD
 router.post("/:id/approve", async (req, res) => {
   try {
     const dep = await Deposit.findById(req.params.id);
     if (!dep) return res.status(404).json({ message: "Deposit not found" });
-    if (dep.status !== "pending") {
-      return res.status(400).json({ message: "Deposit already processed" });
-    }
+    if (dep.status !== "pending") return res.status(400).json({ message: "Deposit already processed" });
 
     const user = await User.findById(dep.userId);
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    // Credit USD balance
     user.balanceUSD = Number(((user.balanceUSD || 0) + (dep.amountUSD || 0)).toFixed(2));
     await user.save();
 
-    // Ledger entry
     await Transaction.create({
       userId: user._id,
       type: "deposit",
@@ -131,21 +108,14 @@ router.post("/:id/approve", async (req, res) => {
   }
 });
 
-/**
- * POST /deposit/:id/reject
- * Reject deposit (no credit). Optionally include a reason.
- * Body: { reason? }
- */
+// POST /api/deposit/:id/reject -> admin rejects (no credit)
 router.post("/:id/reject", async (req, res) => {
   try {
     const dep = await Deposit.findById(req.params.id);
     if (!dep) return res.status(404).json({ message: "Deposit not found" });
-    if (dep.status !== "pending") {
-      return res.status(400).json({ message: "Deposit already processed" });
-    }
+    if (dep.status !== "pending") return res.status(400).json({ message: "Deposit already processed" });
 
     dep.status = "rejected";
-    // Optionally: store reason in a new field if you add one (e.g. dep.note = req.body.reason)
     await dep.save();
 
     res.json({ message: "Deposit rejected" });
@@ -155,10 +125,23 @@ router.post("/:id/reject", async (req, res) => {
   }
 });
 
-/**
- * GET /deposit/my/:userId
- * User: list own deposits
- */
+// ✅ NEW: POST /api/deposit/cancel/:id -> user cancels a pending request
+router.post("/cancel/:id", async (req, res) => {
+  try {
+    const dep = await Deposit.findById(req.params.id);
+    if (!dep) return res.status(404).json({ message: "Deposit not found" });
+    if (dep.status !== "pending") return res.status(400).json({ message: "Deposit already processed" });
+
+    dep.status = "canceled";
+    await dep.save();
+    res.json({ message: "Deposit canceled" });
+  } catch (err) {
+    console.error("deposit cancel error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// GET /api/deposit/my/:userId -> user list
 router.get("/my/:userId", async (req, res) => {
   try {
     const list = await Deposit.find({ userId: req.params.userId }).sort({ createdAt: -1 });
@@ -169,10 +152,7 @@ router.get("/my/:userId", async (req, res) => {
   }
 });
 
-/**
- * GET /deposit/all
- * Admin: list all deposits
- */
+// GET /api/deposit/all -> admin list
 router.get("/all", async (_req, res) => {
   try {
     const list = await Deposit.find().populate("userId", "username email").sort({ createdAt: -1 });
