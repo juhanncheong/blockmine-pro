@@ -73,7 +73,11 @@ router.get('/users', verifyAdminToken, async (req, res) => {
     if (email) query.email = { $regex: email, $options: 'i' };
 
     const total = await User.countDocuments(query);
-    const users = await User.find(query).skip(skip).limit(limit).lean();
+    const users = await User.find(query)
+  .sort({ createdAt: -1, _id: -1 }) // newest → oldest
+  .skip(skip)
+  .limit(limit)
+  .lean();
 
     // Now calculate miningPower for each user dynamically:
     const usersWithMiningPower = await Promise.all(users.map(async (user) => {
