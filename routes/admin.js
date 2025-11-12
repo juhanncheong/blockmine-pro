@@ -236,44 +236,44 @@ router.delete('/packages/:id', verifyAdminToken, async (req, res) => {
 
 // ---------- Admin deposit (manual credit in USD + ledger) ----------
 
-router.post('/admin/deposit', verifyAdminToken, async (req, res) => {
-  try {
-    const { userId, amountUSD } = req.body;
+router.post('/deposit', verifyAdminToken, async (req, res) => {
+   try {
+     const { userId, amountUSD } = req.body;
 
-    const user = await User.findById(userId);
-    if (!user) return res.status(404).json({ message: 'User not found' });
+     const user = await User.findById(userId);
+     if (!user) return res.status(404).json({ message: 'User not found' });
 
-    // Record an approved deposit row for audit
-    const newDeposit = new Deposit({
-      userId: user._id,
-      amountUSD: parseFloat(amountUSD),
-      coin: 'admin',
-      network: 'manual',
-      expectedCoinAmount: 0,
-      quoteRate: 1,
-      status: 'approved',
-      source: 'admin'
-    });
-    await newDeposit.save();
+     // Record an approved deposit row for audit
+     const newDeposit = new Deposit({
+       userId: user._id,
+       amountUSD: parseFloat(amountUSD),
+       coin: 'admin',
+       network: 'manual',
+       expectedCoinAmount: 0,
+       quoteRate: 1,
+       status: 'approved',
+       source: 'admin'
+     });
+     await newDeposit.save();
 
-    // Credit user
-    user.balanceUSD = (user.balanceUSD || 0) + parseFloat(amountUSD);
-    await user.save();
+     // Credit user
+     user.balanceUSD = (user.balanceUSD || 0) + parseFloat(amountUSD);
+     await user.save();
 
-    // Ledger
-    await Transaction.create({
-      userId: user._id,
-      type: 'deposit',
-      amountUSD: parseFloat(amountUSD),
-      note: 'Admin deposit'
-    });
+     // Ledger
+     await Transaction.create({
+       userId: user._id,
+       type: 'deposit',
+       amountUSD: parseFloat(amountUSD),
+       note: 'Admin deposit'
+     });
 
-    res.json({ message: 'Deposit added successfully', balanceUSD: user.balanceUSD });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Server error' });
-  }
-});
+     res.json({ message: 'Deposit added successfully', balanceUSD: user.balanceUSD });
+   } catch (err) {
+     console.error(err);
+     res.status(500).json({ message: 'Server error' });
+   }
+ });
 
 // ---------- Admin attach/detach user packages ----------
 
