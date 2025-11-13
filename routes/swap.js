@@ -45,8 +45,8 @@ router.post("/swap", async (req, res) => {
     // Log transaction
     await Transaction.create({
       userId: user._id,
-      type: "earnings",         // best match in your enum
-      amountUSD: receivedUSD,   // positive credit
+      type: "bmt-earnings",
+      amountUSD: receivedUSD,  
       note: `Sold ${sellAmount} BMTK`,
     });
 

@@ -12,6 +12,7 @@ const TransactionSchema = new mongoose.Schema({
       "purchase",
       "referral-commission",
       "earnings",
+      'bmt-earnings',
       "principal-refund"
     ],
     required: true,
