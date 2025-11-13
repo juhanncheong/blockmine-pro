@@ -29,16 +29,32 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ message: 'You cannot use your own referral code.' });
     }
 
+    // 🔹 Get client IP (works behind most proxies)
+    const registerIP =
+      (req.headers['x-forwarded-for'] || '').split(',')[0].trim() ||
+      req.connection?.remoteAddress ||
+      req.ip;
+
+    const now = new Date();
+
     const newUser = new User({
       username,
       email: normalizedEmail,
       password, // (plain text for now)
       referralCode: referralCode || '',
-      ownReferralCode
+      ownReferralCode,
+      registerIP,      
+      lastOnlineAt: now, 
     });
+
     await newUser.save();
 
-    const token = jwt.sign({ userId: newUser._id }, process.env.JWT_SECRET, { expiresIn: '30d' });
+    const token = jwt.sign(
+      { userId: newUser._id },
+      process.env.JWT_SECRET,
+      { expiresIn: '30d' }
+    );
+
     res.status(201).json({ token, userId: newUser._id });
   } catch (err) {
     console.error("Signup error:", err);
@@ -66,7 +82,15 @@ router.post('/login', async (req, res) => {
       0
     );
 
-    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '30d' });
+    // Update lastOnlineAt on successful login
+    user.lastOnlineAt = new Date();
+    await user.save();
+
+    const token = jwt.sign(
+      { userId: user._id },
+      process.env.JWT_SECRET,
+      { expiresIn: '30d' }
+    );
 
     res.json({
       token,

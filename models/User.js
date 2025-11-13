@@ -16,6 +16,12 @@ const userSchema = new mongoose.Schema({
   bmtBalance:       { type: Number, default: 0 },
   totalWithdrawn:   { type: Number, default: 0 },
 
+  // registration IP address
+  registerIP:       { type: String },
+
+  // last time user was online / logged in
+  lastOnlineAt:     { type: Date },
+
   createdAt:        { type: Date, default: Date.now },
   isFrozen:         { type: Boolean, default: false }
 });
