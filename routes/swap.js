@@ -1,63 +1,65 @@
 const express = require("express");
 const router = express.Router();
-const User = require("../models/User");
-const Transaction = require("../models/Transaction");
-const BMTPriceHistory = require("../models/BMTPriceHistory");
 
+const User = require("../models/User");
+const BMTPriceHistory = require("../models/BMTPriceHistory");
+const Transaction = require("../models/Transaction");
+
+// POST /api/swap  → Sell BMTK for USD
 router.post("/swap", async (req, res) => {
   try {
     const { userId, amount } = req.body;
 
-    if (!userId || !amount || amount <= 0) {
-      return res.status(400).json({ message: "Invalid user or amount" });
+    const sellAmount = Number(amount);
+
+    if (!userId || isNaN(sellAmount) || sellAmount <= 0) {
+      return res.status(400).json({ message: "Invalid amount" });
     }
 
+    // Find user
     const user = await User.findById(userId);
-    if (!user) return res.status(404).json({ message: "User not found" });
-
-    if (user.bmtBalance < amount) {
-      return res.status(400).json({ message: "Insufficient BMT balance" });
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
     }
 
-    // Get latest BMT price
-    const bmtPriceData = await BMTPriceHistory.find().sort({ date: 1 });
-    const latestBMT = bmtPriceData[bmtPriceData.length - 1];
-    const bmtUsd = parseFloat(latestBMT.price);
+    // Check BMTK balance
+    if (user.bmtBalance < sellAmount) {
+      return res.status(400).json({ message: "Insufficient BMTK balance" });
+    }
 
-    // Get BTC price from Binance
-    const btcRes = await fetch("https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT");
-    const btcData = await btcRes.json();
-    const btcUsd = parseFloat(btcData.price);
+    // Latest BMTK price in USD
+    const latestPriceDoc = await BMTPriceHistory.findOne().sort({ _id: -1 });
+    if (!latestPriceDoc || typeof latestPriceDoc.price !== "number") {
+      return res.status(500).json({ message: "Failed to fetch price" });
+    }
 
-    // Calculate BTC to give
-    const usdValue = amount * bmtUsd;
-    const btcAmount = usdValue / btcUsd;
+    const bmtPriceUSD = Number(latestPriceDoc.price);
+    const receivedUSD = sellAmount * bmtPriceUSD;
 
-    // Update user balances
-    user.bmtBalance -= amount;
-    user.balance += btcAmount;
+    // Update balances
+    user.bmtBalance -= sellAmount;
+    user.balanceUSD = (user.balanceUSD || 0) + receivedUSD;
+
     await user.save();
 
-    // Save transaction
-    const tx = new Transaction({
-      userId,
-      type: "swap",
-      bmtAmount: amount,
-      btcAmount,
-      usdValue,
+    // Log transaction
+    await Transaction.create({
+      userId: user._id,
+      type: "earnings",         // best match in your enum
+      amountUSD: receivedUSD,   // positive credit
+      note: `Sold ${sellAmount} BMTK`,
     });
-    await tx.save();
 
-    res.json({
-      message: "Swap successful",
+    return res.json({
+      message: "Sell successful",
+      receivedUSD,
       newBMT: user.bmtBalance,
-      newBTC: user.balance,
-      receivedBTC: btcAmount,
+      newUSD: user.balanceUSD,
     });
 
   } catch (err) {
-    console.error("Swap error", err);
-    res.status(500).json({ message: "Server error" });
+    console.error("Sell error:", err);
+    return res.status(500).json({ message: "Server error" });
   }
 });
 
