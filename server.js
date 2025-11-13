@@ -21,6 +21,7 @@ const swapRoute = require("./routes/swap");
 const stakeRoute = require("./routes/stake");
 const priceRoutes = require("./routes/price");
 const { runDailyEarnings, ensureDailyEarningsUpToDate } = require('./utils/miningJobs');
+const adminBMTSales = require("./routes/adminBMTSales");
 
 // Middleware
 app.use(express.json());
@@ -49,6 +50,7 @@ app.use('/api', bmtRoutes);
 app.use("/api", swapRoute);
 app.use(stakeRoute);
 app.use("/api/price", priceRoutes);
+app.use("/api/admin", adminBMTSales);
 
 // Simple test route
 app.get('/', (req, res) => {
