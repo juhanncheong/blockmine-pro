@@ -60,7 +60,16 @@ mongoose.connect(process.env.MONGO_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 })
-.then(() => console.log('MongoDB connected'))
+.then(async () => {
+  console.log('MongoDB connected');
+
+  // 🔹 Initialize daily earnings / lastMiningEarningsAt in ET
+  try {
+    await ensureDailyEarningsUpToDate();
+  } catch (err) {
+    console.error("Initial ensureDailyEarningsUpToDate failed:", err.message || err);
+  }
+})
 .catch(err => console.error('MongoDB error:', err));
 
 // Start server
@@ -73,7 +82,6 @@ let ensureInFlight = false;
 
 app.use(async (req, res, next) => {
   const now = Date.now();
-  // Max once every 5 minutes to avoid hammering DB on high traffic
   if (!ensureInFlight && now - lastEnsureCheck > 5 * 60 * 1000) {
     ensureInFlight = true;
     lastEnsureCheck = now;
@@ -86,10 +94,10 @@ app.use(async (req, res, next) => {
 
 // Existing cron — now in America/New_York because TZ is set
 cron.schedule('0 0 * * *', async () => {
-  console.log("⏱ Running daily mining earnings from cron...");
+  console.log("⏱ Cron: ensure daily mining earnings are up to date...");
   try {
-    await runDailyEarnings();
+    await ensureDailyEarningsUpToDate();
   } catch (err) {
-    console.error('Cron runDailyEarnings error:', err);
+    console.error('Cron ensureDailyEarningsUpToDate error:', err);
   }
 });

@@ -52,42 +52,37 @@ async function runDailyEarnings() {
  * new Date() is already Eastern time.
  */
 async function ensureDailyEarningsUpToDate() {
-  const now = new Date();
+  const now = new Date(); // already in America/New_York because of TZ
 
   let settings = await GlobalSettings.findOne();
   if (!settings) {
     settings = new GlobalSettings();
   }
 
-  // First time ever: just initialise marker to today and exit (no retro-credit)
+  // ✅ First time ever: pretend we last ran "yesterday"
   if (!settings.lastMiningEarningsAt) {
-    settings.lastMiningEarningsAt = now;
+    const yesterday = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate() - 1
+    );
+    settings.lastMiningEarningsAt = yesterday;
     await settings.save();
-    console.log('[miningJobs] Initialized lastMiningEarningsAt');
-    return;
   }
 
   const daysMissed = wholeDaysBetween(settings.lastMiningEarningsAt, now);
   if (daysMissed <= 0) {
-    // up to date
+    // nothing to do
     return;
   }
 
-  console.log(`[miningJobs] Catch-up needed: ${daysMissed} day(s) of earnings.`);
-
+  console.log(`[miningJobs] Catch-up: ${daysMissed} missing day(s).`);
   for (let i = 0; i < daysMissed; i++) {
-    try {
-      await runDailyEarnings();
-    } catch (err) {
-      console.error('[miningJobs] runDailyEarnings failed during catch-up:', err.message || err);
-      // if one day fails, stop to avoid infinite spam; next user hit will retry
-      break;
-    }
+    await runDailyEarnings();
   }
 
   settings.lastMiningEarningsAt = now;
   await settings.save();
-  console.log('[miningJobs] Catch-up complete, lastMiningEarningsAt updated.');
 }
 
 module.exports = {
