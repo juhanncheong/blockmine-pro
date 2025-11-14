@@ -1,31 +1,20 @@
-const mongoose = require("mongoose");
-
 const depositSchema = new mongoose.Schema({
   userId:              { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
-
-  // What the user intends to pay with (frontend shows live quote)
-  coin:                { type: String, required: true },         // e.g. 'BTC','ETH','USDT-TRC20'
-  network:             { type: String, default: "" },            // optional: 'BTC','ERC20','TRC20'...
-
-  // USD is the source of truth (what you will credit on approval)
-  amountUSD:           { type: Number, required: true },         // e.g. 100.00
-
-  // Quoted details at request time
-  expectedCoinAmount:  { type: Number, required: true },         // coin amount the UI told them to send
-  quoteRate:           { type: Number, default: 0 },             // USD per coin at quote time (from your FE)
+  coin:                { type: String, required: true },
+  network:             { type: String, default: "" },
+  amountUSD:           { type: Number, required: true },
+  expectedCoinAmount:  { type: Number, required: true },
+  quoteRate:           { type: Number, default: 0 },
   quotedAt:            { type: Date, default: Date.now },
-
-  // ✅ NEW: which address the user should send to (from GlobalSettings)
   address:             { type: String, default: "" },
+  txHash:              { type: String, default: "" },
+  confirmations:       { type: Number, default: 0 },
 
-  // Proof (user/admin fills these later)
-  txHash:              { type: String, default: "" },            // on-chain hash / transfer id
-  confirmations:       { type: Number, default: 0 },             // for chains where you track it
-
-  // Workflow
   status:              { type: String, enum: ["pending","approved","rejected","canceled"], default: "pending" },
   source:              { type: String, enum: ["user","admin"], default: "user" },
+
+  // 🔹 NEW: admin-only comment field (can store txid + notes)
+  adminNote:           { type: String, default: "" },
+
   createdAt:           { type: Date, default: Date.now }
 });
-
-module.exports = mongoose.model("Deposit", depositSchema);

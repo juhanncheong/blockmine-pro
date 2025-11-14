@@ -78,6 +78,25 @@ router.patch("/:id/proof", async (req, res) => {
   }
 });
 
+// PATCH /api/deposit/:id/admin-note -> add/update admin note (txid, comments)
+router.patch("/:id/admin-note", async (req, res) => {
+  try {
+    const dep = await Deposit.findById(req.params.id);
+    if (!dep) return res.status(404).json({ message: "Deposit not found" });
+
+    // simple string note
+    if (typeof req.body.adminNote === "string") {
+      dep.adminNote = req.body.adminNote;
+    }
+
+    await dep.save();
+    res.json({ message: "Admin note updated" });
+  } catch (err) {
+    console.error("deposit admin-note error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
 // POST /api/deposit/:id/approve -> admin approves & credits USD
 router.post("/:id/approve", async (req, res) => {
   try {
@@ -152,11 +171,26 @@ router.get("/my/:userId", async (req, res) => {
   }
 });
 
-// GET /api/deposit/pending-count -> for admin sound alerts / polling
+// GET /api/deposit/pending-count -> for admin sound alerts / polling + volume
 router.get("/pending-count", async (_req, res) => {
   try {
-    const pending = await Deposit.countDocuments({ status: "pending" });
-    res.json({ pending });
+    const agg = await Deposit.aggregate([
+      { $match: { status: "pending" } },
+      {
+        $group: {
+          _id: null,
+          count: { $sum: 1 },
+          totalAmountUSD: { $sum: "$amountUSD" },
+        },
+      },
+    ]);
+
+    const stats = agg[0] || { count: 0, totalAmountUSD: 0 };
+
+    res.json({
+      pending: stats.count,              // 🔢 count
+      pendingAmountUSD: stats.totalAmountUSD, // 💵 volume in USD
+    });
   } catch (err) {
     console.error("deposit pending-count error:", err);
     res.status(500).json({ message: "Server error" });
