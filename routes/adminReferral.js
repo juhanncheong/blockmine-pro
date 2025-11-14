@@ -4,13 +4,16 @@ const router = express.Router();
 
 const User = require('../models/User');
 const Transaction = require('../models/Transaction');
+const Deposit = require('../models/Deposit');
+const Withdrawal = require('../models/Withdrawal');
 
-// helper: build full referral overview for a user
 async function buildReferralOverview(user) {
   // who this user invited
   const invitedUsers = await User
     .find({ referralCode: user.ownReferralCode })
     .select('email createdAt');
+
+  const invitedIds = invitedUsers.map((u) => u._id);
 
   // all referral commission transactions
   const txs = await Transaction.find({
@@ -25,14 +28,38 @@ async function buildReferralOverview(user) {
     0
   );
 
+  // 🔹 Downline deposits (approved)
+  let downlineDepositsUSD = 0;
+  // 🔹 Downline withdrawals (paid out)
+  let downlineWithdrawalsUSD = 0;
+
+  if (invitedIds.length > 0) {
+    const depAgg = await Deposit.aggregate([
+      { $match: { userId: { $in: invitedIds }, status: 'approved' } },
+      { $group: { _id: null, total: { $sum: '$amountUSD' } } },
+    ]);
+    downlineDepositsUSD = depAgg[0]?.total || 0;
+
+    const wAgg = await Withdrawal.aggregate([
+      { $match: { userId: { $in: invitedIds }, status: 'paid' } },
+      { $group: { _id: null, total: { $sum: '$amountUSD' } } },
+    ]);
+    downlineWithdrawalsUSD = wAgg[0]?.total || 0;
+  }
+
   return {
     userId: user._id,
     email: user.email,
     ownReferralCode: user.ownReferralCode,
+
     referralCount: invitedUsers.length,
     totalReferralCommissionUSD: Number(totalReferralCommissionUSD.toFixed(2)),
     invitedUsers,
     transactions: txs,
+
+    // 👇 NEW fields for the KPI card
+    downlineDepositsUSD: Number(downlineDepositsUSD.toFixed(2)),
+    downlineWithdrawalsUSD: Number(downlineWithdrawalsUSD.toFixed(2)),
   };
 }
 
