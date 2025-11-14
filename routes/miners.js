@@ -39,7 +39,7 @@ router.get("/summary/:userId", async (req, res) => {
       miners.push({
         packageName: pkg.name || "Package",
         miningPower: Number(pkg.miningPower || 0),
-        purchaseDate: purchaseDate.toISOString().split("T")[0],
+        purchaseDate: purchaseDate,  // keep full datetime
         remainingDays,
         earnedUSD: Number(earnedUSD.toFixed(2)),
         isActive

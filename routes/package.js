@@ -114,15 +114,19 @@ router.post('/purchase', async (req, res) => {
     });
 
     // Create the mining purchase (USD-only, refundable principal at expiry)
-    await MiningPurchase.create({
-      userId: user._id,
-      packageId: pkg._id,
-      purchaseDate: new Date(),
-      isActive: true,
-      earningsUSD: 0,
-      principalUSD: priceUSD,
-      principalRefunded: false
-    });
+const etNow = new Date(
+  new Date().toLocaleString("en-US", { timeZone: "America/New_York" })
+);
+
+await MiningPurchase.create({
+  userId: user._id,
+  packageId: pkg._id,
+  purchaseDate: etNow,   // store ET time, not UTC
+  isActive: true,
+  earningsUSD: 0,
+  principalUSD: priceUSD,
+  principalRefunded: false
+});
 
     // BMT reward (if any)
     const tokensToAdd = Number(pkg.bmtReward || 0);
