@@ -40,14 +40,29 @@ function verifyAdminToken(req, res, next) {
 
 // ---------- Stats ----------
 
+// ---------- Stats ----------
+
 router.get('/stats', verifyAdminToken, async (_req, res) => {
   try {
+    // 1) Total users
     const totalUsers = await User.countDocuments();
-    const totalWithdrawals = await Withdrawal.countDocuments({ status: 'approved' });
-    const pendingWithdrawals = await Withdrawal.countDocuments({ status: 'pending' });
 
-    // Compute mining power from active purchases (lookup into Package)
-    const agg = await MiningPurchase.aggregate([
+    // 2) Total deposits (approved only)
+    const depositsAgg = await Deposit.aggregate([
+      { $match: { status: 'approved' } },
+      { $group: { _id: null, total: { $sum: '$amountUSD' } } }
+    ]);
+    const totalDepositsUSD = depositsAgg[0]?.total || 0;
+
+    // 3) Total withdrawals (PAID only – matches WithdrawalsManagement)
+    const withdrawalsAgg = await Withdrawal.aggregate([
+      { $match: { status: 'paid' } },
+      { $group: { _id: null, total: { $sum: '$amountUSD' } } }
+    ]);
+    const totalWithdrawalsUSD = withdrawalsAgg[0]?.total || 0;
+
+    // 4) Total mining power (same as before)
+    const miningAgg = await MiningPurchase.aggregate([
       { $match: { isActive: true } },
       {
         $lookup: {
@@ -60,15 +75,28 @@ router.get('/stats', verifyAdminToken, async (_req, res) => {
       { $unwind: '$pkg' },
       { $group: { _id: null, totalPower: { $sum: '$pkg.miningPower' } } }
     ]);
-    const totalMiningPower = agg[0]?.totalPower || 0;
+    const totalMiningPower = miningAgg[0]?.totalPower || 0;
+
+    // 5) Total earnings (mining + referral + BMT earnings)
+    const earningsAgg = await Transaction.aggregate([
+      {
+        $match: {
+          type: { $in: ['earnings', 'referral-commission', 'bmt-earnings'] }
+        }
+      },
+      { $group: { _id: null, total: { $sum: '$amountUSD' } } }
+    ]);
+    const totalEarningsUSD = earningsAgg[0]?.total || 0;
 
     res.json({
       totalUsers,
-      totalMiningPower,
-      totalWithdrawals,
-      pendingWithdrawals,
+      totalDepositsUSD: Number(totalDepositsUSD.toFixed(2)),
+      totalWithdrawalsUSD: Number(totalWithdrawalsUSD.toFixed(2)),
+      totalEarningsUSD: Number(totalEarningsUSD.toFixed(2)),
+      totalMiningPower
     });
   } catch (err) {
+    console.error('Admin stats error:', err);
     res.status(500).json({ message: 'Server error' });
   }
 });
