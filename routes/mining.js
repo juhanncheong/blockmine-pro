@@ -134,13 +134,13 @@ router.get('/earnings-history/:userId', async (req, res) => {
   try {
     const earnings = await Transaction.find({
       userId: req.params.userId,
-      type: 'earnings'
+      type: { $in: ["earnings", "referral-commission", "bmt-earnings"] }
     }).sort({ createdAt: -1 });
 
     res.json(earnings);
   } catch (err) {
-    console.error('earnings-history error:', err);
-    res.status(500).json({ message: 'Server error' });
+    console.error("earnings-history error:", err);
+    res.status(500).json({ message: "Server error" });
   }
 });
 
