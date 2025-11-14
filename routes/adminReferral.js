@@ -8,14 +8,14 @@ const Deposit = require('../models/Deposit');
 const Withdrawal = require('../models/Withdrawal');
 
 async function buildReferralOverview(user) {
-  // who this user invited
+  // direct invited users
   const invitedUsers = await User
     .find({ referralCode: user.ownReferralCode })
     .select('email createdAt');
 
   const invitedIds = invitedUsers.map((u) => u._id);
 
-  // all referral commission transactions
+  // referral commission tx for this user
   const txs = await Transaction.find({
     userId: user._id,
     type: 'referral-commission',
@@ -28,24 +28,8 @@ async function buildReferralOverview(user) {
     0
   );
 
-  // 🔹 Downline deposits (approved)
-  let downlineDepositsUSD = 0;
-  // 🔹 Downline withdrawals (paid out)
-  let downlineWithdrawalsUSD = 0;
-
-  if (invitedIds.length > 0) {
-    const depAgg = await Deposit.aggregate([
-      { $match: { userId: { $in: invitedIds }, status: 'approved' } },
-      { $group: { _id: null, total: { $sum: '$amountUSD' } } },
-    ]);
-    downlineDepositsUSD = depAgg[0]?.total || 0;
-
-    const wAgg = await Withdrawal.aggregate([
-      { $match: { userId: { $in: invitedIds }, status: 'paid' } },
-      { $group: { _id: null, total: { $sum: '$amountUSD' } } },
-    ]);
-    downlineWithdrawalsUSD = wAgg[0]?.total || 0;
-  }
+  // team (all levels) tree
+  const tree = await buildDownlineTree(user);
 
   return {
     userId: user._id,
@@ -57,9 +41,97 @@ async function buildReferralOverview(user) {
     invitedUsers,
     transactions: txs,
 
-    // 👇 NEW fields for the KPI card
-    downlineDepositsUSD: Number(downlineDepositsUSD.toFixed(2)),
-    downlineWithdrawalsUSD: Number(downlineWithdrawalsUSD.toFixed(2)),
+    // team totals (all levels)
+    downlineDepositsUSD: tree.teamDepositsUSD,
+    downlineWithdrawalsUSD: tree.teamWithdrawalsUSD,
+
+    // full tree per member
+    downlineTree: tree.nodes,  // [{ userId,email,level,depositsUSD,withdrawalsUSD,... }, ...]
+  };
+}
+
+async function buildDownlineTree(rootUser, maxDepth = 10) {
+  const allNodes = [];
+  const seenIds = new Set();
+
+  let currentLevel = 1;
+  let frontierCodes = [rootUser.ownReferralCode];
+
+  while (frontierCodes.length && currentLevel <= maxDepth) {
+    const users = await User.find({ referralCode: { $in: frontierCodes } })
+      .select('email ownReferralCode referralCode createdAt');
+
+    if (!users.length) break;
+
+    const nextFrontier = [];
+
+    for (const u of users) {
+      const idStr = u._id.toString();
+      if (seenIds.has(idStr)) continue;
+      seenIds.add(idStr);
+
+      allNodes.push({
+        userId: u._id,
+        email: u.email,
+        ownReferralCode: u.ownReferralCode,
+        referralCode: u.referralCode,
+        createdAt: u.createdAt,
+        level: currentLevel,
+      });
+
+      if (u.ownReferralCode) {
+        nextFrontier.push(u.ownReferralCode);
+      }
+    }
+
+    frontierCodes = nextFrontier;
+    currentLevel += 1;
+  }
+
+  if (!allNodes.length) {
+    return {
+      nodes: [],
+      teamDepositsUSD: 0,
+      teamWithdrawalsUSD: 0,
+    };
+  }
+
+  const ids = allNodes.map((n) => n.userId);
+
+  // Aggregate deposits for all downline users
+  const depAgg = await Deposit.aggregate([
+    { $match: { userId: { $in: ids }, status: 'approved' } },
+    { $group: { _id: '$userId', total: { $sum: '$amountUSD' } } },
+  ]);
+
+  const wAgg = await Withdrawal.aggregate([
+    { $match: { userId: { $in: ids }, status: 'paid' } },
+    { $group: { _id: '$userId', total: { $sum: '$amountUSD' } } },
+  ]);
+
+  const depMap = new Map(depAgg.map((r) => [String(r._id), r.total]));
+  const wMap = new Map(wAgg.map((r) => [String(r._id), r.total]));
+
+  let teamDepositsUSD = 0;
+  let teamWithdrawalsUSD = 0;
+
+  const nodesWithTotals = allNodes.map((n) => {
+    const idStr = String(n.userId);
+    const dep = Number(depMap.get(idStr) || 0);
+    const w = Number(wMap.get(idStr) || 0);
+    teamDepositsUSD += dep;
+    teamWithdrawalsUSD += w;
+    return {
+      ...n,
+      depositsUSD: dep,
+      withdrawalsUSD: w,
+    };
+  });
+
+  return {
+    nodes: nodesWithTotals,
+    teamDepositsUSD: Number(teamDepositsUSD.toFixed(2)),
+    teamWithdrawalsUSD: Number(teamWithdrawalsUSD.toFixed(2)),
   };
 }
 
