@@ -152,6 +152,17 @@ router.get("/my/:userId", async (req, res) => {
   }
 });
 
+// GET /api/deposit/pending-count -> for admin sound alerts / polling
+router.get("/pending-count", async (_req, res) => {
+  try {
+    const pending = await Deposit.countDocuments({ status: "pending" });
+    res.json({ pending });
+  } catch (err) {
+    console.error("deposit pending-count error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
 // GET /api/deposit/all -> admin list
 router.get("/all", async (_req, res) => {
   try {
