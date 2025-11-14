@@ -41,7 +41,7 @@ app.use("/api/wallet", walletRoutes);
 app.use("/api/deposit", depositRoutes);
 app.use("/api/transactions", transactionRoutes);
 app.use('/api/referral', referralRoutes);
-app.use('/api/admin/referral', adminReferralRoutes);
+app.use('/api/admin/referral', require('./routes/adminReferral'));
 app.use("/api/admin/pending-deposits", adminPendingDepositRoutes);
 app.use("/api/admin/stats", adminStatsRoutes);
 app.use("/api/admin/manual-deposit", adminManualDepositRoute);

@@ -1,66 +1,86 @@
-const express = require("express");
+// routes/adminReferral.js
+const express = require('express');
 const router = express.Router();
-const Deposit = require("../models/Deposit");
-const User = require("../models/User");
-const Transaction = require("../models/Transaction");
 
-// ✅ GET all pending deposits
-router.get("/", async (_req, res) => {
+const User = require('../models/User');
+const Transaction = require('../models/Transaction');
+
+// helper: build full referral overview for a user
+async function buildReferralOverview(user) {
+  // who this user invited
+  const invitedUsers = await User
+    .find({ referralCode: user.ownReferralCode })
+    .select('email createdAt');
+
+  // all referral commission transactions
+  const txs = await Transaction.find({
+    userId: user._id,
+    type: 'referral-commission',
+  })
+    .sort({ createdAt: -1 })
+    .select('amountUSD note createdAt');
+
+  const totalReferralCommissionUSD = txs.reduce(
+    (sum, tx) => sum + Number(tx.amountUSD || 0),
+    0
+  );
+
+  return {
+    userId: user._id,
+    email: user.email,
+    ownReferralCode: user.ownReferralCode,
+    referralCount: invitedUsers.length,
+    totalReferralCommissionUSD: Number(totalReferralCommissionUSD.toFixed(2)),
+    invitedUsers,
+    transactions: txs,
+  };
+}
+
+/**
+ * GET /api/admin/referral/by-email?email=...
+ */
+router.get('/by-email', async (req, res) => {
   try {
-    const pending = await Deposit.find({ status: "pending" }).populate("userId");
-    res.json(pending);
+    const { email } = req.query;
+    if (!email) {
+      return res.status(400).json({ message: 'Missing email' });
+    }
+
+    const user = await User.findOne({ email: email.trim().toLowerCase() });
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const overview = await buildReferralOverview(user);
+    return res.json(overview);
   } catch (err) {
-    console.error("Failed to fetch pending deposits:", err);
-    res.status(500).json({ message: "Server error" });
+    console.error('admin referral by-email error:', err);
+    return res.status(500).json({ message: 'Server error' });
   }
 });
 
-// ✅ POST approve deposit
-router.post("/:id/approve", async (req, res) => {
+/**
+ * GET /api/admin/referral/by-code?code=...
+ * looks up the user whose ownReferralCode matches
+ */
+router.get('/by-code', async (req, res) => {
   try {
-    const deposit = await Deposit.findById(req.params.id);
-    if (!deposit) return res.status(404).json({ message: "Deposit not found" });
-    if (deposit.status !== "pending") return res.status(400).json({ message: "Already processed" });
+    const { code } = req.query;
+    if (!code) {
+      return res.status(400).json({ message: 'Missing code' });
+    }
 
-    deposit.status = "approved";
-    await deposit.save();
+    const normalizedCode = code.trim().toUpperCase();
+    const user = await User.findOne({ ownReferralCode: normalizedCode });
+    if (!user) {
+      return res.status(404).json({ message: 'User not found for this referral code' });
+    }
 
-    // ✅ Credit USD balance
-    const user = await User.findById(deposit.userId);
-    if (!user) return res.status(404).json({ message: "User not found" });
-
-    user.balanceUSD = (user.balanceUSD || 0) + (deposit.amountUSD || 0);
-    await user.save();
-
-    // ✅ Ledger entry
-    await Transaction.create({
-      userId: deposit.userId,
-      type: "deposit",
-      amountUSD: deposit.amountUSD,
-      note: `Approved deposit via ${deposit.coin}${deposit.network ? "@" + deposit.network : ""}`
-    });
-
-    res.json({ message: "Deposit approved and credited in USD", balanceUSD: user.balanceUSD });
+    const overview = await buildReferralOverview(user);
+    return res.json(overview);
   } catch (err) {
-    console.error("Approve deposit error:", err);
-    res.status(500).json({ message: "Server error" });
-  }
-});
-
-// ✅ POST reject deposit
-router.post("/:id/reject", async (req, res) => {
-  try {
-    const deposit = await Deposit.findById(req.params.id);
-    if (!deposit) return res.status(404).json({ message: "Deposit not found" });
-    if (deposit.status !== "pending") return res.status(400).json({ message: "Already processed" });
-
-    deposit.status = "rejected";
-    await deposit.save();
-
-    res.json({ message: "Deposit rejected" });
-  } catch (err) {
-    console.error("Reject deposit error:", err);
-    res.status(500).json({ message: "Server error" });
+    console.error('admin referral by-code error:', err);
+    return res.status(500).json({ message: 'Server error' });
   }
 });
 

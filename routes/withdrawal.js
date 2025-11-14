@@ -195,6 +195,36 @@ router.get('/my/:userId', async (req, res) => {
 });
 
 /**
+ * GET /withdrawal/pending-count
+ * Returns pending count + total USD
+ */
+router.get('/pending-count', async (_req, res) => {
+  try {
+    const agg = await Withdrawal.aggregate([
+      { $match: { status: 'pending' } },
+      {
+        $group: {
+          _id: null,
+          count: { $sum: 1 },
+          amountUSD: { $sum: '$amountUSD' }
+        }
+      }
+    ]);
+
+    const stats = agg[0] || { count: 0, amountUSD: 0 };
+
+    res.json({
+      pending: stats.count,
+      pendingAmountUSD: stats.amountUSD
+    });
+
+  } catch (err) {
+    console.error('withdrawal pending-count error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+/**
  * GET /withdrawal/all — admin list (newest first)
  */
 router.get('/all', async (_req, res) => {
