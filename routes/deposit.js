@@ -5,6 +5,7 @@ const User = require("../models/User");
 const Deposit = require("../models/Deposit");
 const Transaction = require("../models/Transaction");
 const GlobalSettings = require('../models/GlobalSettings');
+const { sendDepositApprovedEmail } = require("../utils/mailer");
 
 // POST /api/deposit  -> create pending deposit (user flow)
 router.post("/", async (req, res) => {
@@ -102,25 +103,47 @@ router.post("/:id/approve", async (req, res) => {
   try {
     const dep = await Deposit.findById(req.params.id);
     if (!dep) return res.status(404).json({ message: "Deposit not found" });
-    if (dep.status !== "pending") return res.status(400).json({ message: "Deposit already processed" });
+    if (dep.status !== "pending")
+      return res.status(400).json({ message: "Deposit already processed" });
 
     const user = await User.findById(dep.userId);
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    user.balanceUSD = Number(((user.balanceUSD || 0) + (dep.amountUSD || 0)).toFixed(2));
+    user.balanceUSD = Number(
+      ((user.balanceUSD || 0) + (dep.amountUSD || 0)).toFixed(2)
+    );
     await user.save();
 
     await Transaction.create({
       userId: user._id,
       type: "deposit",
       amountUSD: Number(dep.amountUSD || 0),
-      note: `Deposit via ${dep.coin}${dep.network ? "@" + dep.network : ""}${dep.txHash ? " tx:" + dep.txHash : ""}`
+      note: `Deposit via ${dep.coin}${
+        dep.network ? "@" + dep.network : ""
+      }${dep.txHash ? " tx:" + dep.txHash : ""}`,
     });
 
     dep.status = "approved";
     await dep.save();
 
-    res.json({ message: "Deposit approved and credited", balanceUSD: user.balanceUSD });
+    // 🔔 Send email ONLY for user-submitted deposits
+    if (dep.source !== "admin") {
+      // we don't want manual admin balance tweaks to fire an email
+      sendDepositApprovedEmail({
+        to: user.email,
+        username: user.username || user.email,
+        amountUSD: dep.amountUSD,
+        coin: dep.coin,
+        txHash: dep.txHash,
+      }).catch((err) => {
+        console.error("Failed to send deposit email:", err);
+      });
+    }
+
+    res.json({
+      message: "Deposit approved and credited",
+      balanceUSD: user.balanceUSD,
+    });
   } catch (err) {
     console.error("deposit approve error:", err);
     res.status(500).json({ message: "Server error" });
