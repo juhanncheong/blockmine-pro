@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 
 const User = require('../models/User');
 const MiningPurchase = require('../models/MiningPurchase');
+const fetch = require('node-fetch');
 
 // Generate random referral code
 function generateReferralCode(length = 6) {
@@ -35,16 +36,39 @@ router.post('/register', async (req, res) => {
       req.connection?.remoteAddress ||
       req.ip;
 
+    // 🔹 Default country empty
+    let country = "";
+
+    // Only call geo API if IP looks public (skip localhost / internal)
+    if (
+      registerIP &&
+      !registerIP.startsWith("127.") &&
+      !registerIP.startsWith("10.") &&
+      !registerIP.startsWith("192.168.")
+    ) {
+      try {
+        // You can switch to any other geo API you prefer
+        const geoRes = await fetch(`https://ipapi.co/${registerIP}/json/`);
+        if (geoRes.ok) {
+          const geo = await geoRes.json();
+          country = geo.country_name || "";
+        }
+      } catch (geoErr) {
+        console.warn("Geo IP lookup failed:", geoErr.message || geoErr);
+      }
+    }
+
     const now = new Date();
 
     const newUser = new User({
       username,
       email: normalizedEmail,
       password, // (plain text for now)
-      referralCode: referralCode || '',
+      referralCode: referralCode || "",
       ownReferralCode,
-      registerIP,      
-      lastOnlineAt: now, 
+      registerIP,
+      country,
+      lastOnlineAt: now,
     });
 
     await newUser.save();

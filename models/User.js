@@ -23,6 +23,9 @@ const userSchema = new mongoose.Schema({
   // registration IP address
   registerIP:       { type: String }, 
 
+  // registration country (geo-IP lookup)
+  country:          { type: String, default: "" },
+
   // last time user was online / logged in
   lastOnlineAt:     { type: Date },
 
