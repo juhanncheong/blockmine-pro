@@ -20,6 +20,7 @@ const LEDGER_WITHDRAW_TYPE = 'withdraw';
 const reBTC = /^(bc1[a-z0-9]{11,71}|[13][a-km-zA-HJ-NP-Z1-9]{25,39})$/i; // bech32 or base58
 const reEVM = /^0x[a-fA-F0-9]{40}$/;                                    // ETH/USDC/USDT on EVM
 const reTRON = /^T[1-9A-HJ-NP-Za-km-z]{33}$/;                            // USDT/USDC TRC20
+const { sendWithdrawalRequestEmail } = require("../utils/mailer");
 
 function validateAddress(method, address) {
   if (!address || typeof address !== 'string') return false;
@@ -107,6 +108,16 @@ router.post('/request', async (req, res) => {
       details: address,          // <— address lives here
       status: 'pending'
     });
+    
+    // 🔔 Send email to user
+    sendWithdrawalRequestEmail({
+      to: user.email,
+      username: user.username || user.email,
+      amountUSD: amt,
+      method,
+      details: address,
+      withdrawalId: w._id
+    }).catch(console.error);
 
     return res.json({
       message: 'Withdrawal requested (pending)',

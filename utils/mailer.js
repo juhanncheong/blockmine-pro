@@ -26,4 +26,28 @@ async function sendDepositApprovedEmail({ to, username, amountUSD, coin, txHash 
   return apiInstance.sendTransacEmail(sendSmtpEmail);
 }
 
+async function sendWithdrawalRequestEmail({ to, username, amountUSD, method, details, withdrawalId }) {
+  const sendSmtpEmail = new brevo.SendSmtpEmail();
+
+  sendSmtpEmail.sender = { name: "BlockMinePro", email: "support@blockminepro.com" };
+  sendSmtpEmail.to = [{ email: to }];
+
+  sendSmtpEmail.templateId = 9;  // 🔹 use your real Brevo template ID
+
+  sendSmtpEmail.params = {
+    username,
+    amountUSD,
+    method,
+    details,
+    withdrawalId
+  };
+
+  return apiInstance.sendTransacEmail(sendSmtpEmail);
+}
+
+module.exports = {
+  sendDepositApprovedEmail,
+  sendWithdrawalRequestEmail
+};
+
 module.exports = { sendDepositApprovedEmail };
