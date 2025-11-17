@@ -296,7 +296,7 @@ router.post('/deposit', verifyAdminToken, async (req, res) => {
       user.balanceUSD = (user.balanceUSD || 0) + amount;
     }
 
-    await user.save();
+    await user.save({ validateBeforeSave: false });
 
     await Transaction.create({
       userId: user._id,
