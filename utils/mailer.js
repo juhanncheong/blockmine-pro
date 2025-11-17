@@ -1,3 +1,11 @@
+const brevo = require("@getbrevo/brevo");
+
+const apiInstance = new brevo.TransactionalEmailsApi();
+apiInstance.setApiKey(
+  brevo.TransactionalEmailsApiApiKeys.apiKey,
+  process.env.BREVO_API_KEY
+);
+
 async function sendDepositApprovedEmail({ to, username, amountUSD, coin, txHash }) {
   const sendSmtpEmail = new brevo.SendSmtpEmail();
 
@@ -17,3 +25,5 @@ async function sendDepositApprovedEmail({ to, username, amountUSD, coin, txHash 
 
   return apiInstance.sendTransacEmail(sendSmtpEmail);
 }
+
+module.exports = { sendDepositApprovedEmail };
