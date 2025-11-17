@@ -13,11 +13,15 @@ const userSchema = new mongoose.Schema({
   balanceUSD:       { type: Number, default: 0 },       // spendable USD balance
   earningsUSD:      { type: Number, default: 0 },       // lifetime credited USD earnings
 
+    // promo / bonus balance (NOT directly withdrawable)
+  bonusBalanceUSD:  { type: Number, default: 0 },       // admin-credited bonus, used to purchase packages
+  welcomeBonusRedeemed: { type: Boolean, default: false }, // has claimed the one-time $35 promo
+
   bmtBalance:       { type: Number, default: 0 },
   totalWithdrawn:   { type: Number, default: 0 },
 
   // registration IP address
-  registerIP:       { type: String },
+  registerIP:       { type: String }, 
 
   // last time user was online / logged in
   lastOnlineAt:     { type: Date },

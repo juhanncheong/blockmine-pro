@@ -80,7 +80,7 @@ router.post('/run-daily-earnings', async (req, res) => {
 /**
  * POST /mining/cleanup-expired
  * - Marks purchases inactive once duration is reached
- * - Refunds principalUSD exactly once if not already refunded
+ * - Refunds principal exactly once if not already refunded
  * - Records Transaction(type='principal-refund', amountUSD=+)
  */
 router.post('/cleanup-expired', async (req, res) => {
@@ -99,17 +99,31 @@ router.post('/cleanup-expired', async (req, res) => {
         if (!p.principalRefunded && p.principalUSD > 0) {
           const user = await User.findById(p.userId);
           if (user) {
-            user.balanceUSD = (user.balanceUSD || 0) + p.principalUSD;
-            await user.save();
+            // NEW: split-based refund
+            const fromBonus = Number(p.principalFromBonusUSD || 0);
+            const fromBalance = Number(p.principalFromBalanceUSD || 0);
 
-            await Transaction.create({
-              userId: user._id,
-              type: 'principal-refund',
-              amountUSD: p.principalUSD,
-              note: `Refund for purchase ${p._id}`
-            });
+            let refundTotal = fromBonus + fromBalance;
 
-            p.principalRefunded = true;
+            // Backwards compatibility: older purchases may not have split fields set
+            if (refundTotal <= 0) {
+              refundTotal = Number(p.principalUSD || 0);
+            }
+
+            if (refundTotal > 0) {
+              // After expiry, BOTH parts become normal withdrawable balance
+              user.balanceUSD = (user.balanceUSD || 0) + refundTotal;
+              await user.save();
+
+              await Transaction.create({
+                userId: user._id,
+                type: 'principal-refund',
+                amountUSD: refundTotal,
+                note: `Refund for purchase ${p._id} (bonus: $${fromBonus.toFixed(2)}, balance: $${fromBalance.toFixed(2)})`
+              });
+
+              p.principalRefunded = true;
+            }
           }
         }
 

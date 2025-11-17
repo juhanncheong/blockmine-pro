@@ -13,6 +13,12 @@ const MiningPurchaseSchema = new mongoose.Schema({
   // Principal paid in USD (refunded at expiry)
   principalUSD: { type: Number, default: 0 },
 
+  // How much principal came from BONUS (unlocked into real balance after expiry)
+  principalFromBonusUSD: { type: Number, default: 0 },
+
+  // How much principal came from NORMAL balance
+  principalFromBalanceUSD: { type: Number, default: 0 },
+
   // Marks that the principal has already been refunded once
   principalRefunded: { type: Boolean, default: false }
 });

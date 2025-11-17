@@ -80,15 +80,39 @@ router.post('/purchase', async (req, res) => {
       return res.status(400).json({ message: 'Package priceUSD is invalid' });
     }
 
-    // Check USD balance
-    if ((user.balanceUSD || 0) < priceUSD) {
-      return res.status(400).json({ message: 'Insufficient USD balance' });
+    // ---- NEW: use bonus + normal balance together ----
+    const currentBalanceUSD = Number(user.balanceUSD || 0);
+    const currentBonusUSD = Number(user.bonusBalanceUSD || 0);
+    const totalAvailable = currentBalanceUSD + currentBonusUSD;
+
+    if (totalAvailable < priceUSD) {
+      return res.status(400).json({ message: 'Insufficient USD balance (including bonus)' });
     }
 
-    // Debit user USD balance
-    user.balanceUSD = Number(((user.balanceUSD || 0) - priceUSD).toFixed(2));
+    // Deduct from BONUS first, then from NORMAL
+    let remaining = priceUSD;
+    let usedFromBonus = 0;
+    let usedFromBalance = 0;
 
-    // Optional referral commission (guard self-referral) — 15% of priceUSD
+    if (currentBonusUSD > 0) {
+      usedFromBonus = Math.min(currentBonusUSD, remaining);
+      remaining -= usedFromBonus;
+    }
+
+    if (remaining > 0) {
+      // At this point we know totalAvailable >= priceUSD, so balance must be enough for remaining
+      if (currentBalanceUSD < remaining) {
+        return res.status(400).json({ message: 'Insufficient normal balance for remaining amount' });
+      }
+      usedFromBalance = remaining;
+      remaining = 0;
+    }
+
+    // Apply deductions to user
+    user.bonusBalanceUSD = Number((currentBonusUSD - usedFromBonus).toFixed(2));
+    user.balanceUSD = Number((currentBalanceUSD - usedFromBalance).toFixed(2));
+
+    // Optional referral commission (guard self-referral) — 15% of priceUSD (based on full package price)
     if (user.referralCode && user.referralCode !== user.ownReferralCode) {
       const inviter = await User.findOne({ ownReferralCode: user.referralCode });
       if (inviter) {
@@ -105,28 +129,30 @@ router.post('/purchase', async (req, res) => {
       }
     }
 
-    // Record the purchase spend (negative)
+    // Record the purchase spend (negative) - full price
     await Transaction.create({
       userId: user._id,
       type: 'purchase',
       amountUSD: -priceUSD,
-      note: pkg.name
+      note: `${pkg.name} (bonus: $${usedFromBonus.toFixed(2)}, balance: $${usedFromBalance.toFixed(2)})`
     });
 
-    // Create the mining purchase (USD-only, refundable principal at expiry)
-const etNow = new Date(
-  new Date().toLocaleString("en-US", { timeZone: "America/New_York" })
-);
+    // Create the mining purchase (track how much came from bonus vs normal)
+    const etNow = new Date(
+      new Date().toLocaleString("en-US", { timeZone: "America/New_York" })
+    );
 
-await MiningPurchase.create({
-  userId: user._id,
-  packageId: pkg._id,
-  purchaseDate: etNow,   // store ET time, not UTC
-  isActive: true,
-  earningsUSD: 0,
-  principalUSD: priceUSD,
-  principalRefunded: false
-});
+    await MiningPurchase.create({
+      userId: user._id,
+      packageId: pkg._id,
+      purchaseDate: etNow,   // store ET time, not UTC
+      isActive: true,
+      earningsUSD: 0,
+      principalUSD: priceUSD,
+      principalFromBonusUSD: usedFromBonus,
+      principalFromBalanceUSD: usedFromBalance,
+      principalRefunded: false
+    });
 
     // BMT reward (if any)
     const tokensToAdd = Number(pkg.bmtReward || 0);
@@ -150,7 +176,8 @@ await MiningPurchase.create({
     res.json({
       message: 'Package purchased successfully (USD)',
       miningPower: totalMiningPower,
-      balanceUSD: user.balanceUSD
+      balanceUSD: user.balanceUSD,
+      bonusBalanceUSD: user.bonusBalanceUSD
     });
 
   } catch (err) {
