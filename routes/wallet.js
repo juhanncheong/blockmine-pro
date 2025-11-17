@@ -21,9 +21,16 @@ router.get("/balance/:userId", async (req, res) => {
     );
 
     res.json({
-      usdBalance: Number(user.balanceUSD || 0), // ← USD-only
-      miningPower: totalMiningPower
-    });
+     // withdrawable balance
+     usdBalance: Number(user.balanceUSD || 0),
+     balanceUSD: Number(user.balanceUSD || 0),
+
+     // 👇 NEW: bonus balance included
+     bonusBalanceUSD: Number(user.bonusBalanceUSD || 0),
+
+     // mining power
+     miningPower: totalMiningPower
+   });
 
   } catch (err) {
     console.error(err);
