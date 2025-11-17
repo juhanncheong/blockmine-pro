@@ -286,7 +286,7 @@ router.post('/deposit', verifyAdminToken, async (req, res) => {
       expectedCoinAmount: 0,
       quoteRate: 1,
       status: "approved",
-      source: type === "bonus" ? "admin_bonus" : "admin",
+      source: "admin",
     });
     await newDeposit.save();
 
