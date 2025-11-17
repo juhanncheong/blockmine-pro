@@ -262,46 +262,69 @@ router.delete('/packages/:id', verifyAdminToken, async (req, res) => {
   }
 });
 
-// ---------- Admin deposit (manual credit in USD + ledger) ----------
-
+// ---------- Admin deposit (manual credit with bonus support) ----------
 router.post('/deposit', verifyAdminToken, async (req, res) => {
-   try {
-     const { userId, amountUSD } = req.body;
+  try {
+    const { userId, amountUSD, depositType } = req.body;
 
-     const user = await User.findById(userId);
-     if (!user) return res.status(404).json({ message: 'User not found' });
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ message: 'User not found' });
 
-     // Record an approved deposit row for audit
-     const newDeposit = new Deposit({
-       userId: user._id,
-       amountUSD: parseFloat(amountUSD),
-       coin: 'admin',
-       network: 'manual',
-       expectedCoinAmount: 0,
-       quoteRate: 1,
-       status: 'approved',
-       source: 'admin'
-     });
-     await newDeposit.save();
+    const amount = Number(amountUSD);
+    if (!amount || amount <= 0) {
+      return res.status(400).json({ message: 'Invalid amount' });
+    }
 
-     // Credit user
-     user.balanceUSD = (user.balanceUSD || 0) + parseFloat(amountUSD);
-     await user.save();
+    const type = depositType === "bonus" ? "bonus" : "normal";
 
-     // Ledger
-     await Transaction.create({
-       userId: user._id,
-       type: 'deposit',
-       amountUSD: parseFloat(amountUSD),
-       note: 'Admin deposit'
-     });
+    // Create deposit audit row
+    const newDeposit = new Deposit({
+      userId: user._id,
+      amountUSD: amount,
+      coin: "USD",
+      network: type === "bonus" ? "admin_bonus" : "manual",
+      expectedCoinAmount: 0,
+      quoteRate: 1,
+      status: "approved",
+      source: type === "bonus" ? "admin_bonus" : "admin",
+    });
+    await newDeposit.save();
 
-     res.json({ message: 'Deposit added successfully', balanceUSD: user.balanceUSD });
-   } catch (err) {
-     console.error(err);
-     res.status(500).json({ message: 'Server error' });
-   }
- });
+    // Apply balance update
+    if (type === "bonus") {
+      user.bonusBalanceUSD = (user.bonusBalanceUSD || 0) + amount;
+      user.welcomeBonusRedeemed = true;
+    } else {
+      user.balanceUSD = (user.balanceUSD || 0) + amount;
+    }
+
+    await user.save();
+
+    // Ledger
+    await Transaction.create({
+      userId: user._id,
+      type: type === "bonus" ? "bonusDeposit" : "deposit",
+      amountUSD: amount,
+      note: type === "bonus" ? "Admin bonus credit" : "Admin manual deposit",
+    });
+
+    console.log(
+      `⭐ ADMIN ${type.toUpperCase()} DEPOSIT: +$${amount} → ${user.email}`
+    );
+
+    res.json({
+      message:
+        type === "bonus"
+          ? "Bonus USD credited successfully"
+          : "Manual USD deposit added successfully",
+      balanceUSD: user.balanceUSD,
+      bonusBalanceUSD: user.bonusBalanceUSD,
+    });
+  } catch (err) {
+    console.error("Admin deposit error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
 
 // ---------- Admin attach/detach user packages ----------
 
