@@ -277,7 +277,6 @@ router.post('/deposit', verifyAdminToken, async (req, res) => {
 
     const type = depositType === "bonus" ? "bonus" : "normal";
 
-    // Create deposit audit row
     const newDeposit = new Deposit({
       userId: user._id,
       amountUSD: amount,
@@ -286,11 +285,10 @@ router.post('/deposit', verifyAdminToken, async (req, res) => {
       expectedCoinAmount: 0,
       quoteRate: 1,
       status: "approved",
-      source: "admin",
+      source: "admin"
     });
     await newDeposit.save();
 
-    // Apply balance update
     if (type === "bonus") {
       user.bonusBalanceUSD = (user.bonusBalanceUSD || 0) + amount;
       user.welcomeBonusRedeemed = true;
@@ -300,7 +298,6 @@ router.post('/deposit', verifyAdminToken, async (req, res) => {
 
     await user.save();
 
-    // Ledger
     await Transaction.create({
       userId: user._id,
       type: type === "bonus" ? "bonusDeposit" : "deposit",
@@ -308,18 +305,14 @@ router.post('/deposit', verifyAdminToken, async (req, res) => {
       note: type === "bonus" ? "Admin bonus credit" : "Admin manual deposit",
     });
 
-    console.log(
-      `⭐ ADMIN ${type.toUpperCase()} DEPOSIT: +$${amount} → ${user.email}`
-    );
-
     res.json({
-      message:
-        type === "bonus"
-          ? "Bonus USD credited successfully"
-          : "Manual USD deposit added successfully",
+      message: type === "bonus"
+        ? "Bonus USD credited successfully"
+        : "Manual USD deposit added successfully",
       balanceUSD: user.balanceUSD,
-      bonusBalanceUSD: user.bonusBalanceUSD,
+      bonusBalanceUSD: user.bonusBalanceUSD
     });
+
   } catch (err) {
     console.error("Admin deposit error:", err);
     res.status(500).json({ message: "Server error" });
