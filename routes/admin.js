@@ -9,8 +9,7 @@ const MiningPurchase = require('../models/MiningPurchase');
 const Package = require('../models/Package');
 const Deposit = require('../models/Deposit');
 const Stake = require('../models/Stake');
-const Transaction = require('../models/Transaction');
-const BMTPriceHistory = require('../models/BMTPriceHistory');
+const Transaction = require('../models/Transaction'); // ← for USD ledger writes
 
 // ---------- Auth ----------
 
@@ -453,23 +452,6 @@ router.get('/bmt-stats', verifyAdminToken, async (_req, res) => {
   } catch (err) {
     console.error('Failed to fetch BMT stats', err);
     res.status(500).json({ message: 'Server error' });
-  }
-});
-
-// ---------- BMT Price History (delete) ----------
-router.delete('/bmt-price-history/:id', verifyAdminToken, async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const deleted = await BMTPriceHistory.findByIdAndDelete(id);
-    if (!deleted) {
-      return res.status(404).json({ message: 'Price history entry not found' });
-    }
-
-    return res.json({ message: 'BMT price history entry deleted successfully' });
-  } catch (err) {
-    console.error('Delete BMT price history error:', err);
-    return res.status(500).json({ message: 'Server error' });
   }
 });
 

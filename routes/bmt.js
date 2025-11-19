@@ -37,4 +37,21 @@ router.post('/bmt-price-history', async (req, res) => {
   }
 });
 
+// ---------- BMT Price History (delete) ----------
+router.delete('/bmt-price-history/:id', verifyAdminToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const deleted = await BMTPriceHistory.findByIdAndDelete(id);
+    if (!deleted) {
+      return res.status(404).json({ message: 'Price history entry not found' });
+    }
+
+    return res.json({ message: 'BMT price history entry deleted successfully' });
+  } catch (err) {
+    console.error('Delete BMT price history error:', err);
+    return res.status(500).json({ message: 'Server error' });
+  }
+});
+
 module.exports = router;
