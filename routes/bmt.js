@@ -38,7 +38,7 @@ router.post('/bmt-price-history', async (req, res) => {
 });
 
 // ---------- BMT Price History (delete) ----------
-router.delete('/bmt-price-history/:id', verifyAdminToken, async (req, res) => {
+router.delete('/bmt-price-history/:id', async (req, res) => {
   try {
     const { id } = req.params;
 
